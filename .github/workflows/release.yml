@@ -1,0 +1,112 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Bartek Kus
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-rust:
+    name: Build Rust (${{ matrix.output_name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Practical V1 set
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            output_name: linux_amd64
+
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            output_name: darwin_amd64
+
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            output_name: darwin_arm64
+
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            output_name: windows_amd64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Build (axiomregent)
+        shell: bash
+        run: |
+          cd rust
+          cargo build -p axiomregent --release --target "${{ matrix.target }}"
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          rm -rf dist && mkdir -p dist
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            cp "rust/target/${{ matrix.target }}/release/axiomregent.exe" "dist/axiomregent.exe"
+          else
+            cp "rust/target/${{ matrix.target }}/release/axiomregent" "dist/axiomregent"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-binaries-${{ matrix.output_name }}
+          path: dist/*
+
+  goreleaser:
+    name: GoReleaser (bundle + publish)
+    needs: build-rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download Rust artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: rust-dist
+          pattern: rust-binaries-*
+          merge-multiple: false
+
+      - name: Show rust-dist layout
+        run: ls -R rust-dist
+
+      - name: Smoke Test (Release Candidate)
+        run: |
+          # 1. Test XRAY binary for linux_amd64 (ubuntu-latest host)
+          chmod +x rust-dist/rust-binaries-linux_amd64/xray
+          ./rust-dist/rust-binaries-linux_amd64/xray --help
+
+          # 2. Test Cortex build (simulate GoReleaser build)
+          mkdir -p dist
+          go build -trimpath -ldflags="-s -w -X main.version=smoke-test" -o dist/axiomregent-smoke ./cmd/axiomregent
+          ./dist/axiomregent-smoke version
+
+          # 3. Test axiomregent binary (verify it runs/displays help)
+          chmod +x rust-dist/rust-binaries-linux_amd64/axiomregent
+          ./rust-dist/rust-binaries-linux_amd64/axiomregent --help
+

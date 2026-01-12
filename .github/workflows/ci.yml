@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Bartek Kus
+
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  fast-check:
+    name: Lint, Docs, Quick Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Cortex
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Lint
+        run: make lint
+
+      - name: Format Check
+        run: make fmt-check
+
+      - name: Test
+        run: make test
+
+      - name: Build
+        run: make build

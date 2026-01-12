@@ -1,0 +1,11 @@
+# CODEOWNERS
+
+# Default owner
+* @bartekus
+
+# Governance and Specs
+/spec/ @bartekus
+/changes/ @bartekus
+
+# Core Rust Crates
+/crates/ @bartekus
