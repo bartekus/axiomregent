@@ -29,9 +29,6 @@ jobs:
         with:
           workspaces: rust
 
-      - name: Install Tools
-        run: make install
-
       - name: Lint
         run: make lint
 
