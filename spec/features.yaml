@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Bartek Kus
+# AxiomRegent Feature Registry
+# Authoritative source of truth for AxiomRegent capabilities and contracts.
+
+features:
+  # --- Core System ---
+  - id: MCP_ROUTER
+    title: "Core MCP Router & Dispatch"
+    governance: approved
+    implementation: todo
+    spec: "spec/core/router.md"
+    owner: core-team
+    group: core
+    tests: ["tests/mcp_router_contract_test.rs"]
+    depends_on: []
+
+  - id: MCP_SNAPSHOT_WORKSPACE
+    title: "Snapshot & Workspace Tools"
+    governance: approved
+    implementation: todo
+    spec: "spec/core/snapshot-workspace.md"
+    owner: core-team
+    group: core
+    tests: ["src/snapshot/tools.rs", "tests/mcp_tools_test.rs"]
+    depends_on: ["MCP_ROUTER"]
+
+  - id: FEATUREGRAPH_REGISTRY
+    title: "Feature Graph Registry & Lookup"
+    governance: approved
+    implementation: todo
+    spec: "spec/core/featuregraph.md"
+    owner: core-team
+    group: core
+    tests: ["crates/featuregraph/src/scanner.rs"]
+    depends_on: ["MCP_ROUTER"]
+
+  - id: GOVERNANCE_ENGINE
+    title: "Governance Engine (Preflight & Drift)"
+    governance: approved
+    implementation: todo
+    spec: "spec/core/governance.md"
+    owner: core-team
+    group: core
+    tests: ["crates/featuregraph/src/preflight.rs"]
+    depends_on: ["FEATUREGRAPH_REGISTRY"]
+
+  # --- Analysis & Automation ---
+  - id: XRAY_ANALYSIS
+    title: "Xray Repository Analysis"
+    governance: approved
+    implementation: todo
+    spec: "spec/xray/analysis.md"
+    owner: analysis-team
+    group: analysis
+    tests: ["crates/xray/src/lib.rs"]
+    depends_on: []
+
+  - id: ANTIGRAVITY_AUTOMATION
+    title: "Antigravity Automation Agent"
+    governance: approved
+    implementation: todo
+    spec: "spec/antigravity/automation.md"
+    owner: automation-team
+    group: automation
+    tests: ["crates/antigravity/src/lib.rs"]
+    depends_on: ["MCP_SNAPSHOT_WORKSPACE", "GOVERNANCE_ENGINE", "XRAY_ANALYSIS"]
+
+  # --- CLI & Runtime ---
+  - id: AXIOMREGENT_RUN_SKILLS
+    title: "AxiomRegent Run CLI Skills"
+    governance: approved
+    implementation: todo
+    spec: "spec/run/skills.md"
+    owner: cli-team
+    group: run
+    tests: ["crates/run/src/skills/mod.rs"]
+    depends_on: []
