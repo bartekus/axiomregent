@@ -1,0 +1,1130 @@
+// Feature: MCP_TOOLS
+// Spec: spec/core/tools.md
+
+// Router module
+pub mod cache;
+pub mod mounts;
+
+use crate::io::fs::RealFs;
+// Feature: MCP_ROUTER
+// Spec: spec/core/router.md
+use crate::resolver::order::ResolveEngine;
+use crate::router::mounts::MountRegistry;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use std::sync::Arc;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct JsonRpcRequest {
+    pub jsonrpc: String,
+    pub method: String,
+    pub params: Option<Value>,
+    pub id: Option<Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct JsonRpcResponse {
+    pub jsonrpc: String,
+    pub result: Option<Value>,
+    pub error: Option<Value>,
+    pub id: Option<Value>,
+}
+
+use crate::snapshot::lease::StaleLeaseError;
+
+/// AxiomRegentError represents MCP-level errors that are surfaced to clients using
+/// string error codes defined by the MCP common schema.
+///
+/// NOTE: We intentionally avoid adding new dependencies here (e.g. `thiserror`).
+#[derive(Debug)]
+pub enum AxiomRegentError {
+    NotFound(String),
+    InvalidArgument(String),
+    RepoChanged(String),
+    PermissionDenied(String),
+    TooLarge(String),
+    Internal(String),
+}
+
+impl AxiomRegentError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            AxiomRegentError::NotFound(_) => "NOT_FOUND",
+            AxiomRegentError::InvalidArgument(_) => "INVALID_ARGUMENT",
+            AxiomRegentError::RepoChanged(_) => "REPO_CHANGED",
+            AxiomRegentError::PermissionDenied(_) => "PERMISSION_DENIED",
+            AxiomRegentError::TooLarge(_) => "TOO_LARGE",
+            AxiomRegentError::Internal(_) => "INTERNAL",
+        }
+    }
+
+    fn message(&self) -> &str {
+        match self {
+            AxiomRegentError::NotFound(m)
+            | AxiomRegentError::InvalidArgument(m)
+            | AxiomRegentError::RepoChanged(m)
+            | AxiomRegentError::PermissionDenied(m)
+            | AxiomRegentError::TooLarge(m)
+            | AxiomRegentError::Internal(m) => m.as_str(),
+        }
+    }
+}
+
+impl std::fmt::Display for AxiomRegentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message())
+    }
+}
+
+impl std::error::Error for AxiomRegentError {}
+use crate::antigravity_tools::AntigravityTools;
+use crate::feature_tools::FeatureTools;
+use crate::snapshot::tools::SnapshotTools;
+use crate::workspace::WorkspaceTools;
+use crate::xray_tools::XrayTools;
+
+pub struct Router {
+    resolver: Arc<ResolveEngine<RealFs>>,
+    mounts: MountRegistry,
+    snapshot_tools: Arc<SnapshotTools>,
+    workspace_tools: Arc<WorkspaceTools>,
+    feature_tools: Arc<FeatureTools>,
+    xray_tools: Arc<XrayTools>,
+    antigravity_tools: Arc<AntigravityTools>,
+}
+
+impl Router {
+    pub fn new(
+        resolver: Arc<ResolveEngine<RealFs>>,
+        mounts: MountRegistry,
+        snapshot_tools: Arc<SnapshotTools>,
+        workspace_tools: Arc<WorkspaceTools>,
+        feature_tools: Arc<FeatureTools>,
+        xray_tools: Arc<XrayTools>,
+        antigravity_tools: Arc<AntigravityTools>,
+    ) -> Self {
+        Self {
+            resolver,
+            mounts,
+            snapshot_tools,
+            workspace_tools,
+            feature_tools,
+            xray_tools,
+            antigravity_tools,
+        }
+    }
+
+    pub fn handle_request(&self, req: &JsonRpcRequest) -> JsonRpcResponse {
+        match req.method.as_str() {
+            "initialize" => json_rpc_ok(
+                req.id.clone(),
+                json!({
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": get_server_capabilities(),
+                    "serverInfo": { "name": "mcp", "version": "0.1.0" }
+                }),
+            ),
+            "tools/list" => json_rpc_ok(
+                req.id.clone(),
+                json!({
+                                    "tools": [
+                                        {
+                                            "name": "resolve_mcp",
+                                            "description": "Resolve an MCP server name to a local path or alias",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": { "name": { "type": "string" } },
+                                                "required": ["name"]
+                                            }
+                                        },
+                                        {
+                                            "name": "list_mounts",
+                                            "description": "List currently resolved/mounted servers",
+                                            "inputSchema": { "type": "object", "properties": {} }
+                                        },
+                                        {
+                                            "name": "snapshot.create",
+                                            "description": "Create a new snapshot",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "lease_id": { "type": "string" },
+                                                    "paths": { "type": "array", "items": { "type": "string" } }
+                                                },
+                                                "required": ["repo_root"]
+                                            }
+                                        },
+                                        {
+                                            "name": "snapshot.list",
+                                            "description": "List files in a snapshot or worktree. Supports pagination via limit/offset.",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "path": { "type": "string" },
+                                                    "mode": { "type": "string", "enum": ["worktree", "snapshot"] },
+                                                    "lease_id": { "type": "string" },
+                                                    "snapshot_id": { "type": "string" },
+                                                    "limit": { "type": "integer" },
+                                                    "offset": { "type": "integer" }
+                                                },
+                                                "required": ["repo_root", "path", "mode"]
+                                            }
+                                        },
+                                        {
+                                            "name": "snapshot.file",
+                                            "description": "Read a file from snapshot or worktree. In worktree mode, returns a mutable 'snapshot_id' (hash of state) and 'until_dirty' cache hint.",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "path": { "type": "string" },
+                                                    "mode": { "type": "string", "enum": ["worktree", "snapshot"] },
+                                                    "lease_id": { "type": "string" },
+                                                    "snapshot_id": { "type": "string" }
+                                                },
+                                                "required": ["repo_root", "path", "mode"]
+                                            }
+                                        },
+                                        {
+                                            "name": "snapshot.grep",
+                                            "description": "Search for a pattern",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "pattern": { "type": "string" },
+                                                    "path": { "type": "string" },
+                                                    "mode": { "type": "string", "enum": ["worktree", "snapshot"] },
+                                                    "lease_id": { "type": "string" },
+                                                    "snapshot_id": { "type": "string" },
+                                                    "case_insensitive": { "type": "boolean" }
+                                                },
+                                                "required": ["repo_root", "pattern", "mode"]
+                                            }
+                                        },
+                                        {
+                                            "name": "workspace.apply_patch",
+                                            "description": "Apply a patch. In snapshot mode, returns a NEW snapshot_id (immutable). In worktree mode, modifies files in place.",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "patch": { "type": "string" },
+                                                    "mode": { "type": "string", "enum": ["worktree", "snapshot"] },
+                                                    "strip": { "type": "integer" },
+                                                    "reject_on_conflict": { "type": "boolean" },
+                                                    "dry_run": { "type": "boolean" },
+                                                    "lease_id": { "type": "string" },
+                                                    "snapshot_id": { "type": "string" }
+                                                },
+                                                "required": ["repo_root", "patch", "mode"]
+                                            }
+                                        },
+                                        {
+                                            "name": "workspace.write_file",
+                                            "description": "Write a file",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "path": { "type": "string" },
+                                                    "content": { "type": "string" },
+                                                    "lease_id": { "type": "string" },
+                                                    "create_dirs": { "type": "boolean" },
+                                                    "dry_run": { "type": "boolean" }
+                                                },
+                                                "required": ["repo_root", "path", "content", "lease_id"]
+                                            }
+                                        },
+                                        {
+                                            "name": "workspace.delete",
+                                            "description": "Delete a file",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "path": { "type": "string" },
+                                                    "lease_id": { "type": "string" },
+                                                    "dry_run": { "type": "boolean" }
+                                                },
+                                                "required": ["repo_root", "path", "lease_id"]
+                                            }
+                                        },
+                                        {
+                                            "name": "snapshot.info",
+                                            "description": "Get snapshot info (fingerprint or specific snapshot metadata)",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "snapshot_id": { "type": "string" }
+                                                },
+                                                "required": ["repo_root"]
+                                            }
+                                        },
+                                        {
+                                            "name": "snapshot.changes",
+                                            "description": "Get changes",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "snapshot_id": { "type": "string" },
+                                                    "from_snapshot_id": { "type": "string" }
+                                                },
+                                                "required": ["repo_root", "snapshot_id"]
+                                            }
+                                        },
+                                        {
+                                            "name": "snapshot.diff",
+                                            "description": "Get detailed diff",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "path": { "type": "string" },
+                                                    "mode": { "type": "string", "enum": ["worktree", "snapshot"] },
+                                                    "lease_id": { "type": "string" },
+                                                    "snapshot_id": { "type": "string" },
+                                                    "from_snapshot_id": { "type": "string" }
+                                                },
+                                                "required": ["repo_root", "path", "mode"]
+                                            }
+                                        },
+                                        {
+                                            "name": "snapshot.export",
+                                            "description": "Export snapshot",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "snapshot_id": { "type": "string" }
+                                                },
+                                                "required": ["repo_root", "snapshot_id"]
+                                            }
+                                        }
+                ,
+                                        {
+                                            "name": "features.locate",
+                                            "description": "Locate a feature by ID, spec path, or file path",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "selector_kind": { "type": "string", "enum": ["feature_id", "spec_path", "file_path"] },
+                                                    "selector_value": { "type": "string" }
+                                                },
+                                                "required": ["repo_root", "selector_kind", "selector_value"]
+                                            }
+                                        },
+                                        {
+                                            "name": "gov.preflight",
+                                            "description": "Check preflight violations for proposed changes",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "intent": { "type": "string", "enum": ["edit", "create", "delete", "refactor"] },
+                                                    "mode": { "type": "string", "enum": ["worktree", "snapshot"] },
+                                                    "changed_paths": { "type": "array", "items": { "type": "string" } },
+                                                    "snapshot_id": { "type": "string" }
+                                                },
+                                                "required": ["repo_root", "intent", "mode", "changed_paths"]
+                                            }
+                                        },
+                                        {
+                                            "name": "xray.scan",
+                                            "description": "Scan repository and return Xray index",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "target": { "type": "string", "description": "Target directory to scan" }
+                                                },
+                                                "required": ["target"]
+                                            }
+                                        },
+                                        {
+                                            "name": "features.overview",
+                                            "description": "Get overview of all features",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "snapshot_id": { "type": "string" }
+                                                },
+                                                "required": ["repo_root"]
+                                            }
+                                        },
+                                        {
+                                            "name": "features.impact",
+                                            "description": "Calculate feature impact for changed paths",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "changed_paths": { "type": "array", "items": { "type": "string" } },
+                                                    "snapshot_id": { "type": "string" }
+                                                },
+                                                "required": ["repo_root", "changed_paths"]
+                                            }
+                                        },
+                                        {
+                                            "name": "gov.drift",
+                                            "description": "Detect governance drift (violations)",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "snapshot_id": { "type": "string" }
+                                                },
+                                                "required": ["repo_root"]
+                                            }
+                                        },
+                                        {
+                                            "name": "antigravity.propose",
+                                            "description": "Propose a changeset using Antigravity agents",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "subject": { "type": "string" },
+                                                    "goal": { "type": "string" },
+                                                    "base_state_created_at": { "type": "string" },
+                                                    "repo_key": { "type": "string" },
+                                                    "base_state": { "type": "string" },
+                                                    "tasks": { "type": "array", "items": { "type": "object" } },
+                                                    "tiers": { "type": "array", "items": { "type": "string" } },
+                                                    "architecture_doc": { "type": "string" }
+                                                },
+                                                "required": ["repo_root", "subject", "goal"]
+                                            }
+                                        },
+                                        {
+                                            "name": "antigravity.execute",
+                                            "description": "Execute a validated changeset",
+                                            "inputSchema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "repo_root": { "type": "string" },
+                                                    "changeset_id": { "type": "string" }
+                                                },
+                                                "required": ["repo_root", "changeset_id"]
+                                            }
+                                        }
+                                    ]
+                                }),
+            ),
+
+            "tools/call" => {
+                let params = match req.params.as_ref().and_then(|p| p.as_object()) {
+                    Some(p) => p,
+                    None => return json_rpc_error(req.id.clone(), -32602, "Invalid params"),
+                };
+                let name = match params.get("name").and_then(|n| n.as_str()) {
+                    Some(n) => n,
+                    None => return json_rpc_error(req.id.clone(), -32602, "Missing tool name"),
+                };
+                let args = params.get("arguments").and_then(|a| a.as_object());
+                let args = match args {
+                    Some(a) => a,
+                    None => return json_rpc_error(req.id.clone(), -32602, "Missing arguments"),
+                };
+
+                match name {
+                    "resolve_mcp" => {
+                        let target = args.get("name").and_then(|n| n.as_str());
+                        if let Some(target) = target {
+                            match self.resolver.resolve(target) {
+                                Ok(resp) => {
+                                    if resp.status
+                                        == crate::protocol::types::ResolveStatus::Resolved
+                                        && let (Some(root), Some(rid)) =
+                                            (&resp.root, &resp.resolved_id)
+                                    {
+                                        self.mounts.register(crate::router::mounts::Mount {
+                                            name: target.to_string(),
+                                            root: root.clone(),
+                                            resolved_id: Some(rid.clone()),
+                                            kind: resp.kind.clone(),
+                                            capabilities: resp.capabilities.clone(),
+                                        });
+                                    }
+                                    let content = json!([{ "type": "json", "json": resp }]);
+                                    json_rpc_ok(req.id.clone(), json!({ "content": content }))
+                                }
+                                Err(e) => json_rpc_error(
+                                    req.id.clone(),
+                                    -32603,
+                                    &format!("Resolution failed: {}", e),
+                                ),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing name argument")
+                        }
+                    }
+                    "list_mounts" => {
+                        let list = self.mounts.list();
+                        json_rpc_ok(
+                            req.id.clone(),
+                            json!({ "content": [{ "type": "json", "json": list }] }),
+                        )
+                    }
+                    "get_capabilities" => {
+                        let caps = json!({
+                            "name": "mcp",
+                            "server_capabilities": get_server_capabilities(),
+                        });
+                        json_rpc_ok(
+                            req.id.clone(),
+                            json!({ "content": [{ "type": "json", "json": caps }] }),
+                        )
+                    }
+                    "features.locate" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let selector_kind = args.get("selector_kind").and_then(|s| s.as_str());
+                        let selector_value = args.get("selector_value").and_then(|s| s.as_str());
+
+                        if let (Some(root), Some(kind), Some(value)) =
+                            (repo_root, selector_kind, selector_value)
+                        {
+                            match self
+                                .feature_tools
+                                .locate(std::path::Path::new(root), kind, value)
+                            {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing required arguments")
+                        }
+                    }
+                    "gov.preflight" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+
+                        // Deserialize the complex arguments into PreflightRequest manually or via serde_json values
+                        // To avoid reimplementing strict parsing, let's use serde_json::from_value if possible,
+                        // but `args` is a Map<String, Value>.
+                        // We need to construct PreflightRequest from it.
+
+                        use crate::feature_tools::{
+                            PreflightIntent, PreflightMode, PreflightRequest,
+                        };
+
+                        // Helper to extract enum
+                        let intent =
+                            args.get("intent")
+                                .and_then(|s| s.as_str())
+                                .and_then(|s| match s {
+                                    "edit" => Some(PreflightIntent::Edit),
+                                    "create" => Some(PreflightIntent::Create),
+                                    "delete" => Some(PreflightIntent::Delete),
+                                    "refactor" => Some(PreflightIntent::Refactor),
+                                    _ => None,
+                                });
+                        let mode =
+                            args.get("mode")
+                                .and_then(|s| s.as_str())
+                                .and_then(|s| match s {
+                                    "worktree" => Some(PreflightMode::Worktree),
+                                    "snapshot" => Some(PreflightMode::Snapshot),
+                                    _ => None,
+                                });
+                        let changed_paths = args
+                            .get("changed_paths")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                    .collect::<Vec<String>>()
+                            });
+                        let snapshot_id = args
+                            .get("snapshot_id")
+                            .and_then(|s| s.as_str())
+                            .map(|s| s.to_string());
+
+                        if let (Some(root), Some(i), Some(m), Some(cp)) =
+                            (repo_root, intent, mode, changed_paths)
+                        {
+                            let req_obj = PreflightRequest {
+                                intent: i,
+                                mode: m,
+                                changed_paths: cp,
+                                snapshot_id,
+                            };
+
+                            match self
+                                .feature_tools
+                                .preflight(std::path::Path::new(root), req_obj)
+                            {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(
+                                req.id.clone(),
+                                -32602,
+                                "Missing or invalid arguments for gov.preflight",
+                            )
+                        }
+                    }
+                    "xray.scan" => {
+                        let target = args.get("target").and_then(|s| s.as_str());
+                        if let Some(t) = target {
+                            match self.xray_tools.scan(std::path::Path::new(t)) {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing target argument")
+                        }
+                    }
+                    "features.overview" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let snapshot_id = args.get("snapshot_id").and_then(|s| s.as_str());
+                        if let Some(root) = repo_root {
+                            match self.feature_tools.overview(
+                                std::path::Path::new(root),
+                                snapshot_id.map(|s| s.to_string()),
+                            ) {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing repo_root argument")
+                        }
+                    }
+                    "features.impact" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let snapshot_id = args.get("snapshot_id").and_then(|s| s.as_str());
+                        let changed_paths = args
+                            .get("changed_paths")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                    .collect::<Vec<String>>()
+                            });
+
+                        if let (Some(root), Some(paths)) = (repo_root, changed_paths) {
+                            match self.feature_tools.impact(
+                                std::path::Path::new(root),
+                                paths,
+                                snapshot_id.map(|s| s.to_string()),
+                            ) {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing required arguments")
+                        }
+                    }
+                    "gov.drift" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let snapshot_id = args.get("snapshot_id").and_then(|s| s.as_str());
+                        if let Some(root) = repo_root {
+                            match self.feature_tools.drift(
+                                std::path::Path::new(root),
+                                snapshot_id.map(|s| s.to_string()),
+                            ) {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing repo_root argument")
+                        }
+                    }
+                    "antigravity.propose" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        if let Some(root) = repo_root {
+                            // Deserialize AgentConfig from args
+                            // We need to construct it manually or use serde_json::from_value
+                            // Since args is Map<String, Value>, we can convert it back to Value
+                            let args_val = serde_json::Value::Object(args.clone());
+                            let config: Result<antigravity::agent::AgentConfig, _> =
+                                serde_json::from_value(args_val);
+
+                            match config {
+                                Ok(cfg) => {
+                                    match self
+                                        .antigravity_tools
+                                        .propose(std::path::Path::new(root), cfg)
+                                    {
+                                        Ok(path) => json_rpc_ok(
+                                            req.id.clone(),
+                                            json!({ "content": [{ "type": "json", "json": { "changeset_path": path } }] }),
+                                        ),
+                                        Err(e) => map_error(req.id.clone(), e),
+                                    }
+                                }
+                                Err(e) => json_rpc_error(
+                                    req.id.clone(),
+                                    -32602,
+                                    &format!("Invalid agent config: {}", e),
+                                ),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing repo_root argument")
+                        }
+                    }
+                    "antigravity.execute" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let changeset_id = args.get("changeset_id").and_then(|s| s.as_str());
+
+                        if let (Some(root), Some(cid)) = (repo_root, changeset_id) {
+                            match self
+                                .antigravity_tools
+                                .execute(std::path::Path::new(root), cid)
+                            {
+                                Ok(_) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": { "status": "executed" } }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing required arguments")
+                        }
+                    }
+                    "snapshot.create" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let lease_id = args.get("lease_id").and_then(|s| s.as_str());
+                        let paths = args.get("paths").and_then(|v| v.as_array()).map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                .collect()
+                        });
+
+                        if let Some(root) = repo_root {
+                            match self.snapshot_tools.snapshot_create(
+                                std::path::Path::new(root),
+                                lease_id.map(|s| s.to_string()),
+                                paths,
+                            ) {
+                                Ok(res) => {
+                                    self.feature_tools.invalidate(std::path::Path::new(root));
+                                    json_rpc_ok(
+                                        req.id.clone(),
+                                        json!({ "content": [{ "type": "json", "json": res }] }),
+                                    )
+                                }
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing repo_root")
+                        }
+                    }
+                    "snapshot.list" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let path = args.get("path").and_then(|s| s.as_str());
+                        let mode = args.get("mode").and_then(|s| s.as_str());
+                        let lease_id = args.get("lease_id").and_then(|s| s.as_str());
+                        let snapshot_id = args.get("snapshot_id").and_then(|s| s.as_str());
+                        let limit = args
+                            .get("limit")
+                            .and_then(|v| v.as_u64())
+                            .map(|u| u as usize);
+                        let offset = args
+                            .get("offset")
+                            .and_then(|v| v.as_u64())
+                            .map(|u| u as usize);
+
+                        if let (Some(root), Some(p), Some(m)) = (repo_root, path, mode) {
+                            match self.snapshot_tools.snapshot_list(
+                                std::path::Path::new(root),
+                                p,
+                                m,
+                                lease_id.map(|s| s.to_string()),
+                                snapshot_id.map(|s| s.to_string()),
+                                limit,
+                                offset,
+                            ) {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing required arguments")
+                        }
+                    }
+                    "snapshot.file" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let path = args.get("path").and_then(|s| s.as_str());
+                        let mode = args.get("mode").and_then(|s| s.as_str());
+                        let lease_id = args.get("lease_id").and_then(|s| s.as_str());
+                        let snapshot_id = args.get("snapshot_id").and_then(|s| s.as_str());
+
+                        if let (Some(root), Some(p), Some(m)) = (repo_root, path, mode) {
+                            match self.snapshot_tools.snapshot_file(
+                                std::path::Path::new(root),
+                                p,
+                                m,
+                                lease_id.map(|s| s.to_string()),
+                                snapshot_id.map(|s| s.to_string()),
+                            ) {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }), // snapshot_file returns json value directly
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing required arguments")
+                        }
+                    }
+                    "snapshot.grep" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let pattern = args.get("pattern").and_then(|s| s.as_str());
+                        let paths = args.get("paths").and_then(|v| v.as_array()).map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                .collect()
+                        });
+                        let path_deprecated = args.get("path").and_then(|s| s.as_str());
+                        // Support legacy path arg? Or just paths array?
+                        // Tools logic supports `paths: Option<Vec<String>>`.
+                        // If path arg present, add to paths.
+                        let mut paths = paths;
+                        if let Some(p) = path_deprecated {
+                            if paths.is_none() {
+                                paths = Some(vec![]);
+                            }
+                            if let Some(ref mut v) = paths {
+                                v.push(p.to_string());
+                            }
+                        }
+
+                        let mode = args.get("mode").and_then(|s| s.as_str());
+                        let lease_id = args.get("lease_id").and_then(|s| s.as_str());
+                        let snapshot_id = args.get("snapshot_id").and_then(|s| s.as_str());
+                        let case_insensitive = args
+                            .get("case_insensitive")
+                            .and_then(|b| b.as_bool())
+                            .unwrap_or(false);
+
+                        if let (Some(root), Some(pat), Some(m)) = (repo_root, pattern, mode) {
+                            match self.snapshot_tools.snapshot_grep(
+                                std::path::Path::new(root),
+                                pat,
+                                paths,
+                                m,
+                                lease_id.map(|s| s.to_string()),
+                                snapshot_id.map(|s| s.to_string()),
+                                case_insensitive,
+                            ) {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing required arguments")
+                        }
+                    }
+                    "snapshot.info" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let snapshot_id = args.get("snapshot_id").and_then(|s| s.as_str());
+                        if let Some(root) = repo_root {
+                            match self.snapshot_tools.snapshot_info(
+                                std::path::Path::new(root),
+                                snapshot_id.map(|s| s.to_string()),
+                            ) {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing repo_root")
+                        }
+                    }
+                    "snapshot.changes" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let snapshot_id = args.get("snapshot_id").and_then(|s| s.as_str());
+                        let from_snapshot_id =
+                            args.get("from_snapshot_id").and_then(|s| s.as_str());
+                        if let Some(root) = repo_root {
+                            match self.snapshot_tools.snapshot_changes(
+                                std::path::Path::new(root),
+                                snapshot_id.map(|s| s.to_string()),
+                                from_snapshot_id.map(|s| s.to_string()),
+                            ) {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing repo_root")
+                        }
+                    }
+                    "snapshot.diff" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let path = args.get("path").and_then(|s| s.as_str());
+                        let mode = args.get("mode").and_then(|s| s.as_str());
+                        let lease_id = args.get("lease_id").and_then(|s| s.as_str());
+                        let snapshot_id = args.get("snapshot_id").and_then(|s| s.as_str());
+                        let from_snapshot_id =
+                            args.get("from_snapshot_id").and_then(|s| s.as_str());
+
+                        if let (Some(root), Some(p), Some(m)) = (repo_root, path, mode) {
+                            match self.snapshot_tools.snapshot_diff(
+                                std::path::Path::new(root),
+                                p,
+                                m,
+                                lease_id.map(|s| s.to_string()),
+                                snapshot_id.map(|s| s.to_string()),
+                                from_snapshot_id.map(|s| s.to_string()),
+                            ) {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing required arguments")
+                        }
+                    }
+                    "snapshot.export" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let snapshot_id = args.get("snapshot_id").and_then(|s| s.as_str());
+
+                        if let (Some(root), Some(sid)) = (repo_root, snapshot_id) {
+                            match self
+                                .snapshot_tools
+                                .snapshot_export(std::path::Path::new(root), Some(sid.to_string()))
+                            {
+                                Ok(res) => json_rpc_ok(
+                                    req.id.clone(),
+                                    json!({ "content": [{ "type": "json", "json": res }] }),
+                                ),
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing required arguments")
+                        }
+                    }
+                    "workspace.apply_patch" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let patch = args.get("patch").and_then(|s| s.as_str());
+                        let mode = args.get("mode").and_then(|s| s.as_str());
+                        let strip = args
+                            .get("strip")
+                            .and_then(|v| v.as_u64())
+                            .map(|u| u as usize);
+                        let reject_on_conflict = args
+                            .get("reject_on_conflict")
+                            .and_then(|b| b.as_bool())
+                            .unwrap_or(true);
+                        let dry_run = args
+                            .get("dry_run")
+                            .and_then(|b| b.as_bool())
+                            .unwrap_or(false);
+                        let lease_id = args.get("lease_id").and_then(|s| s.as_str());
+                        let snapshot_id = args.get("snapshot_id").and_then(|s| s.as_str());
+
+                        if let (Some(root), Some(p), Some(m)) = (repo_root, patch, mode) {
+                            match self.workspace_tools.apply_patch(
+                                std::path::Path::new(root),
+                                p,
+                                m,
+                                lease_id.map(|s| s.to_string()),
+                                snapshot_id.map(|s| s.to_string()),
+                                strip,
+                                reject_on_conflict,
+                                dry_run,
+                            ) {
+                                Ok(val) => {
+                                    self.feature_tools.invalidate(std::path::Path::new(root));
+                                    json_rpc_ok(
+                                        req.id.clone(),
+                                        json!({ "content": [{ "type": "json", "json": val }] }),
+                                    )
+                                }
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing required arguments")
+                        }
+                    }
+                    "workspace.write_file" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let path = args.get("path").and_then(|s| s.as_str());
+                        let content = args.get("content").and_then(|s| s.as_str());
+                        let lease_id = args.get("lease_id").and_then(|s| s.as_str());
+                        let create_dirs = args
+                            .get("create_dirs")
+                            .and_then(|b| b.as_bool())
+                            .unwrap_or(false);
+                        let dry_run = args
+                            .get("dry_run")
+                            .and_then(|b| b.as_bool())
+                            .unwrap_or(false);
+
+                        if let (Some(root), Some(p), Some(c), Some(lid)) =
+                            (repo_root, path, content, lease_id)
+                        {
+                            match self.workspace_tools.write_file(
+                                std::path::Path::new(root),
+                                p,
+                                c,
+                                Some(lid.to_string()),
+                                create_dirs,
+                                dry_run,
+                            ) {
+                                Ok(res) => {
+                                    if !dry_run {
+                                        self.feature_tools.invalidate(std::path::Path::new(root));
+                                    }
+                                    json_rpc_ok(
+                                        req.id.clone(),
+                                        json!({ "content": [{ "type": "json", "json": { "written": res } }] }),
+                                    )
+                                }
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing required arguments")
+                        }
+                    }
+                    "workspace.delete" => {
+                        let repo_root = args.get("repo_root").and_then(|s| s.as_str());
+                        let path = args.get("path").and_then(|s| s.as_str());
+                        let lease_id = args.get("lease_id").and_then(|s| s.as_str());
+                        let dry_run = args
+                            .get("dry_run")
+                            .and_then(|b| b.as_bool())
+                            .unwrap_or(false);
+
+                        if let (Some(root), Some(p), Some(lid)) = (repo_root, path, lease_id) {
+                            match self.workspace_tools.delete(
+                                std::path::Path::new(root),
+                                p,
+                                Some(lid.to_string()),
+                                dry_run,
+                            ) {
+                                Ok(res) => {
+                                    if !dry_run {
+                                        self.feature_tools.invalidate(std::path::Path::new(root));
+                                    }
+                                    json_rpc_ok(
+                                        req.id.clone(),
+                                        json!({ "content": [{ "type": "json", "json": { "deleted": res } }] }),
+                                    )
+                                }
+                                Err(e) => map_error(req.id.clone(), e),
+                            }
+                        } else {
+                            json_rpc_error(req.id.clone(), -32602, "Missing required arguments")
+                        }
+                    }
+                    _ => json_rpc_error(req.id.clone(), -32601, "Tool not found"),
+                }
+            }
+            "notifications/initialized" => JsonRpcResponse {
+                jsonrpc: "2.0".into(),
+                result: None,
+                error: None,
+                id: None,
+            },
+            _ => json_rpc_error(
+                req.id.clone(),
+                -32601,
+                &format!("Method not found: {}", req.method),
+            ),
+        }
+    }
+}
+
+fn get_server_capabilities() -> Value {
+    json!({
+        "tools": { "listChanged": true },
+        // Add other server capabilities here if needed (e.g. logging, resources)
+    })
+}
+
+fn json_rpc_ok(id: Option<Value>, result: Value) -> JsonRpcResponse {
+    JsonRpcResponse {
+        jsonrpc: "2.0".to_string(),
+        result: Some(result),
+        error: None,
+        id,
+    }
+}
+
+fn json_rpc_error(id: Option<Value>, code: i32, message: &str) -> JsonRpcResponse {
+    JsonRpcResponse {
+        jsonrpc: "2.0".to_string(),
+        result: None,
+        error: Some(json!({ "code": code, "message": message })),
+        id,
+    }
+}
+
+fn map_error(id: Option<Value>, e: anyhow::Error) -> JsonRpcResponse {
+    // Preserve the dedicated schema/code for stale leases.
+    if let Some(sle) = e.downcast_ref::<StaleLeaseError>() {
+        return JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            result: None,
+            error: Some(json!({
+                "code": "STALE_LEASE",
+                "message": sle.msg,
+                "data": {
+                    "current_fingerprint": sle.current_fingerprint,
+                    "lease_id": sle.lease_id
+                }
+            })),
+            id,
+        };
+    }
+
+    // Map well-known MCP schema errors.
+    if let Some(ce) = e.downcast_ref::<AxiomRegentError>() {
+        return JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            result: None,
+            error: Some(json!({
+                "code": ce.code(),
+                "message": ce.to_string(),
+            })),
+            id,
+        };
+    }
+
+    // Default: unknown errors are INTERNAL.
+    JsonRpcResponse {
+        jsonrpc: "2.0".to_string(),
+        result: None,
+        error: Some(json!({
+            "code": "INTERNAL",
+            "message": e.to_string(),
+        })),
+        id,
+    }
+}

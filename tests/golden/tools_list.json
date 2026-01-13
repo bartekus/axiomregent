@@ -1,0 +1,369 @@
+{
+  "tools": [
+    {
+      "name": "resolve_mcp",
+      "description": "Resolve an MCP server name to a local path or alias",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    },
+    {
+      "name": "list_mounts",
+      "description": "List currently resolved/mounted servers",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_capabilities",
+      "description": "Get server capabilities",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "snapshot.list",
+      "description": "List files in a snapshot or worktree",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "worktree",
+              "snapshot"
+            ]
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "repo_root",
+          "path",
+          "mode"
+        ]
+      }
+    },
+    {
+      "name": "snapshot.create",
+      "description": "Create a new snapshot",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "repo_root"
+        ]
+      }
+    },
+    {
+      "name": "snapshot.read",
+      "description": "Read file content",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "worktree",
+              "snapshot"
+            ]
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root",
+          "path",
+          "mode"
+        ]
+      }
+    },
+    {
+      "name": "snapshot.grep",
+      "description": "Search for patterns",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "pattern": {
+            "type": "string"
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "worktree",
+              "snapshot"
+            ]
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string"
+          },
+          "case_insensitive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "repo_root",
+          "pattern",
+          "mode"
+        ]
+      }
+    },
+    {
+      "name": "snapshot.diff",
+      "description": "Generate unified diff",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "worktree",
+              "snapshot"
+            ]
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string"
+          },
+          "from_snapshot_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root",
+          "path",
+          "mode"
+        ]
+      }
+    },
+    {
+      "name": "snapshot.changes",
+      "description": "List changed files between snapshots",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string"
+          },
+          "from_snapshot_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root",
+          "snapshot_id"
+        ]
+      }
+    },
+    {
+      "name": "snapshot.export",
+      "description": "Export snapshot as tarball",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root",
+          "snapshot_id"
+        ]
+      }
+    },
+    {
+      "name": "snapshot.info",
+      "description": "Get snapshot or repository info",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root"
+        ]
+      }
+    },
+    {
+      "name": "workspace.write_file",
+      "description": "Write file content",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "content_base64": {
+            "type": "string"
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "create_dirs": {
+            "type": "boolean"
+          },
+          "dry_run": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "repo_root",
+          "path",
+          "content_base64",
+          "lease_id"
+        ]
+      }
+    },
+    {
+      "name": "workspace.delete",
+      "description": "Delete a file or directory",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "repo_root",
+          "path",
+          "lease_id"
+        ]
+      }
+    },
+    {
+      "name": "workspace.apply_patch",
+      "description": "Apply a patch",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "patch": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "worktree",
+              "snapshot"
+            ]
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string"
+          },
+          "strip": {
+            "type": "integer"
+          },
+          "reject_on_conflict": {
+            "type": "boolean"
+          },
+          "dry_run": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "repo_root",
+          "patch",
+          "mode"
+        ]
+      }
+    }
+  ]
+}
