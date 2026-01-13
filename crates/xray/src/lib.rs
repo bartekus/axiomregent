@@ -14,6 +14,7 @@ pub mod hash;
 pub mod language;
 pub mod loc;
 pub mod schema;
+pub mod tools;
 pub mod traversal;
 pub mod write;
 

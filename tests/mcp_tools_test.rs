@@ -33,12 +33,14 @@ fn test_mcp_tools_list() {
     let workspace_tools = Arc::new(WorkspaceTools::new(lease_store.clone(), store.clone()));
 
     let featuregraph_tools = Arc::new(axiomregent::featuregraph::tools::FeatureGraphTools::new());
+    let xray_tools = Arc::new(axiomregent::xray::tools::XrayTools::new());
     let router = Router::new(
         resolver,
         mounts,
         snapshot_tools,
         workspace_tools,
         featuregraph_tools,
+        xray_tools,
     );
 
     // Test tools/list
@@ -81,12 +83,14 @@ fn test_mcp_tools_call_validation() {
     let workspace_tools = Arc::new(WorkspaceTools::new(lease_store.clone(), store.clone()));
 
     let featuregraph_tools = Arc::new(axiomregent::featuregraph::tools::FeatureGraphTools::new());
+    let xray_tools = Arc::new(axiomregent::xray::tools::XrayTools::new());
     let router = Router::new(
         resolver,
         mounts,
         snapshot_tools,
         workspace_tools,
         featuregraph_tools,
+        xray_tools,
     );
 
     // Call resolve_mcp without name -> Error

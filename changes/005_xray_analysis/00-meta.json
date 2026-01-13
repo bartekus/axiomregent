@@ -1,0 +1,9 @@
+{
+  "id": "005_xray_analysis",
+  "title": "Xray Analysis",
+  "feature_id": "XRAY_ANALYSIS",
+  "status": "implemented",
+  "authors": ["Bartek Kus <bartek@example.com>"],
+  "spec": "spec/xray/analysis.md",
+  "depends_on": []
+}

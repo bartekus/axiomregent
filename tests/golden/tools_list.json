@@ -132,6 +132,24 @@
       }
     },
     {
+      "name": "xray.scan",
+      "description": "Scan repository to build index",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root"
+        ]
+      }
+    },
+    {
       "name": "snapshot.list",
       "description": "List files in a snapshot or worktree",
       "inputSchema": {

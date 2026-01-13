@@ -17,6 +17,7 @@ use featuregraph::tools::FeatureGraphTools;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::Arc;
+use xray::tools::XrayTools;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JsonRpcRequest {
@@ -86,6 +87,7 @@ pub struct Router {
     snapshot_tools: Arc<SnapshotTools>,
     workspace_tools: Arc<WorkspaceTools>,
     featuregraph_tools: Arc<FeatureGraphTools>,
+    xray_tools: Arc<XrayTools>,
 }
 
 impl Router {
@@ -95,6 +97,7 @@ impl Router {
         snapshot_tools: Arc<SnapshotTools>,
         workspace_tools: Arc<WorkspaceTools>,
         featuregraph_tools: Arc<FeatureGraphTools>,
+        xray_tools: Arc<XrayTools>,
     ) -> Self {
         Self {
             resolver,
@@ -102,6 +105,7 @@ impl Router {
             snapshot_tools,
             workspace_tools,
             featuregraph_tools,
+            xray_tools,
         }
     }
 
@@ -188,6 +192,19 @@ impl Router {
                                 "type": "object",
                                 "properties": {
                                     "repo_root": { "type": "string" }
+                                },
+                                "required": ["repo_root"]
+                            }
+                        },
+                        // Xray Tools
+                        {
+                            "name": "xray.scan",
+                            "description": "Scan repository to build index",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "repo_root": { "type": "string" },
+                                    "path": { "type": "string" }
                                 },
                                 "required": ["repo_root"]
                             }
@@ -516,6 +533,26 @@ impl Router {
                             }
                         };
                         match self.featuregraph_tools.governance_drift(repo_root) {
+                            Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
+                            Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                        }
+                    }
+
+                    // --- Xray Tools ---
+                    "xray.scan" => {
+                        let repo_root = match args.get("repo_root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => {
+                                return json_rpc_error(
+                                    req.id.clone(),
+                                    -32602,
+                                    "repo_root required",
+                                );
+                            }
+                        };
+                        let path = args.get("path").and_then(|v| v.as_str()).map(String::from);
+
+                        match self.xray_tools.xray_scan(repo_root, path) {
                             Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
                             Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
                         }

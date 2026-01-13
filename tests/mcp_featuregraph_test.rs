@@ -24,6 +24,7 @@ fn create_router() -> Router {
     let snapshot_tools = Arc::new(SnapshotTools::new(lease_store.clone(), store.clone()));
     let workspace_tools = Arc::new(WorkspaceTools::new(lease_store.clone(), store.clone()));
     let featuregraph_tools = Arc::new(FeatureGraphTools::new());
+    let xray_tools = Arc::new(axiomregent::xray::tools::XrayTools::new());
 
     Router::new(
         resolver,
@@ -31,6 +32,7 @@ fn create_router() -> Router {
         snapshot_tools,
         workspace_tools,
         featuregraph_tools,
+        xray_tools,
     )
 }
 
