@@ -383,6 +383,74 @@
       }
     },
     {
+      "name": "antigravity.propose",
+      "description": "Propose a change",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "repo_key": {
+            "type": "string"
+          },
+          "base_state": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "architecture_doc": {
+            "type": "string"
+          },
+          "base_state_created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root",
+          "subject",
+          "repo_key",
+          "goal",
+          "tasks"
+        ]
+      }
+    },
+    {
+      "name": "antigravity.execute",
+      "description": "Execute a changeset",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "changeset_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root",
+          "changeset_id"
+        ]
+      }
+    },
+    {
       "name": "workspace.write_file",
       "description": "Write file content",
       "inputSchema": {

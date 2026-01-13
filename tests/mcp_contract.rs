@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026  Bartek Kus
 
+use axiomregent::antigravity_tools::AntigravityTools;
+use axiomregent::feature_tools::FeatureTools;
 use axiomregent::io::fs::RealFs;
 use axiomregent::resolver::order::ResolveEngine;
 use axiomregent::router::mounts::MountRegistry;
@@ -30,7 +32,14 @@ fn test_mcp_tools_list_contract() {
     let snapshot_tools = Arc::new(SnapshotTools::new(lease_store.clone(), store.clone()));
     let workspace_tools = Arc::new(WorkspaceTools::new(lease_store.clone(), store.clone()));
     let featuregraph_tools = Arc::new(axiomregent::featuregraph::tools::FeatureGraphTools::new());
+    let feature_tools = Arc::new(FeatureTools::new());
     let xray_tools = Arc::new(axiomregent::xray::tools::XrayTools::new());
+    let antigravity_tools = Arc::new(AntigravityTools::new(
+        workspace_tools.clone(),
+        snapshot_tools.clone(),
+        feature_tools.clone(),
+    ));
+
     let router = Router::new(
         resolver,
         mounts,
@@ -38,6 +47,7 @@ fn test_mcp_tools_list_contract() {
         workspace_tools,
         featuregraph_tools,
         xray_tools,
+        antigravity_tools,
     );
 
     // 2. Call tools/list

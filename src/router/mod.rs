@@ -8,6 +8,7 @@ pub mod mounts;
 use crate::io::fs::RealFs;
 // Feature: MCP_ROUTER
 // Spec: spec/core/router.md
+use crate::antigravity_tools::AntigravityTools;
 use crate::resolver::order::ResolveEngine;
 use crate::router::mounts::MountRegistry;
 use crate::snapshot::lease::StaleLeaseError;
@@ -88,6 +89,7 @@ pub struct Router {
     workspace_tools: Arc<WorkspaceTools>,
     featuregraph_tools: Arc<FeatureGraphTools>,
     xray_tools: Arc<XrayTools>,
+    antigravity_tools: Arc<AntigravityTools>,
 }
 
 impl Router {
@@ -98,6 +100,7 @@ impl Router {
         workspace_tools: Arc<WorkspaceTools>,
         featuregraph_tools: Arc<FeatureGraphTools>,
         xray_tools: Arc<XrayTools>,
+        antigravity_tools: Arc<AntigravityTools>,
     ) -> Self {
         Self {
             resolver,
@@ -106,6 +109,7 @@ impl Router {
             workspace_tools,
             featuregraph_tools,
             xray_tools,
+            antigravity_tools,
         }
     }
 
@@ -323,6 +327,44 @@ impl Router {
                                     "snapshot_id": { "type": "string" }
                                 },
                                 "required": ["repo_root"]
+                            }
+                        },
+                        // Antigravity Tools
+                        {
+                            "name": "antigravity.propose",
+                            "description": "Propose a change",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "repo_root": { "type": "string" },
+                                    "subject": { "type": "string" },
+                                    "repo_key": { "type": "string" },
+                                    "base_state": { "type": "string" },
+                                    "goal": { "type": "string" },
+                                    "tasks": {
+                                        "type": "array",
+                                        "items": { "type": "object" }
+                                    },
+                                    "tiers": {
+                                        "type": "array",
+                                        "items": { "type": "string" }
+                                    },
+                                    "architecture_doc": { "type": "string" },
+                                    "base_state_created_at": { "type": "string" }
+                                },
+                                "required": ["repo_root", "subject", "repo_key", "goal", "tasks"]
+                            }
+                        },
+                        {
+                            "name": "antigravity.execute",
+                            "description": "Execute a changeset",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "repo_root": { "type": "string" },
+                                    "changeset_id": { "type": "string" }
+                                },
+                                "required": ["repo_root", "changeset_id"]
                             }
                         },
                         // Workspace Tools
@@ -553,6 +595,65 @@ impl Router {
                         let path = args.get("path").and_then(|v| v.as_str()).map(String::from);
 
                         match self.xray_tools.xray_scan(repo_root, path) {
+                            Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
+                            Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                        }
+                    }
+
+                    // --- Antigravity Tools ---
+                    "antigravity.propose" => {
+                        let repo_root = match args.get("repo_root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => {
+                                return json_rpc_error(
+                                    req.id.clone(),
+                                    -32602,
+                                    "repo_root required",
+                                );
+                            }
+                        };
+                        // We need to parse everything into AgentConfig.
+                        // Ideally we deserialize `args` directly to AgentConfig,
+                        // but `args` is Map<String, Value>.
+                        // Let's use serde_json::from_value.
+                        let config_res: Result<antigravity::agent::AgentConfig, _> =
+                            serde_json::from_value(Value::Object(args.clone()));
+
+                        match config_res {
+                            Ok(config) => match self.antigravity_tools.propose(repo_root, config) {
+                                Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
+                                Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                            },
+                            Err(e) => json_rpc_error(
+                                req.id.clone(),
+                                -32602,
+                                &format!("Invalid AgentConfig: {}", e),
+                            ),
+                        }
+                    }
+                    "antigravity.execute" => {
+                        let repo_root = match args.get("repo_root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => {
+                                return json_rpc_error(
+                                    req.id.clone(),
+                                    -32602,
+                                    "repo_root required",
+                                );
+                            }
+                        };
+                        let changeset_id = match args.get("changeset_id").and_then(|v| v.as_str()) {
+                            Some(v) => v,
+                            None => {
+                                return json_rpc_error(
+                                    req.id.clone(),
+                                    -32602,
+                                    "changeset_id required",
+                                );
+                            }
+                        };
+
+                        match self.antigravity_tools.execute(repo_root, changeset_id) {
                             Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
                             Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
                         }
