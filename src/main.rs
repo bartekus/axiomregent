@@ -60,9 +60,16 @@ fn main() -> Result<()> {
         lease_store.clone(),
         store.clone(),
     ));
+    let featuregraph_tools = Arc::new(axiomregent::featuregraph::tools::FeatureGraphTools::new());
 
     // 4. Setup Router
-    let router = Router::new(resolver, mounts, snapshot_tools, workspace_tools);
+    let router = Router::new(
+        resolver,
+        mounts,
+        snapshot_tools,
+        workspace_tools,
+        featuregraph_tools,
+    );
 
     // 4. Stdio Loop (MCP framing)
     let stdin = io::stdin();

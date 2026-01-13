@@ -15,4 +15,5 @@ pub mod router;
 pub mod snapshot;
 pub mod util;
 pub mod workspace;
+pub use featuregraph;
 // pub mod xray_tools;
