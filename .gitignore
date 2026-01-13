@@ -32,4 +32,4 @@ bin/axiomregent
 
 lint_output.txt
 _mcp_smoke_test*.txt
-std*.txt
+std*.txt*.original
