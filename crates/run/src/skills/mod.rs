@@ -6,3 +6,18 @@
 pub mod lint_gofumpt;
 pub mod test_build;
 pub mod test_go;
+
+#[cfg(test)]
+mod tests {
+    use crate::runner::Skill;
+    use crate::skills::lint_gofumpt::LintGofumpt;
+    use crate::skills::test_build::TestBuild;
+    use crate::skills::test_go::TestGo;
+
+    #[test]
+    fn test_skill_ids() {
+        assert_eq!(LintGofumpt.id(), "lint:gofumpt");
+        assert_eq!(TestBuild.id(), "test:build");
+        assert_eq!(TestGo.id(), "test:go");
+    }
+}
