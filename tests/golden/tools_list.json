@@ -74,6 +74,64 @@
       }
     },
     {
+      "name": "gov.preflight",
+      "description": "Check governance policy for proposed changes",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "intent": {
+            "type": "string",
+            "enum": [
+              "edit",
+              "create",
+              "delete",
+              "refactor"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "worktree",
+              "snapshot"
+            ]
+          },
+          "changed_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "snapshot_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root",
+          "intent",
+          "mode",
+          "changed_paths"
+        ]
+      }
+    },
+    {
+      "name": "gov.drift",
+      "description": "Check for drift and violations",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root"
+        ]
+      }
+    },
+    {
       "name": "snapshot.list",
       "description": "List files in a snapshot or worktree",
       "inputSchema": {
