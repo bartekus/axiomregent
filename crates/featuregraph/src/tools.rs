@@ -80,4 +80,28 @@ impl FeatureGraphTools {
 
         Err(anyhow!("Must provide feature_id, spec_path, or file_path"))
     }
+
+    pub fn governance_preflight(
+        &self,
+        repo_root: &Path,
+        request: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        let req: crate::preflight::PreflightRequest = serde_json::from_value(request)?;
+        let scanner = Scanner::new(repo_root);
+        let graph = scanner.scan()?;
+
+        let checker = crate::preflight::PreflightChecker::new(repo_root);
+        let response = checker.check(&graph, &req)?;
+
+        let json = serde_json::to_value(response)?;
+        Ok(json)
+    }
+
+    pub fn governance_drift(&self, repo_root: &Path) -> Result<serde_json::Value> {
+        // For now, checks violation list from a fresh scan
+        let scanner = Scanner::new(repo_root);
+        let graph = scanner.scan()?;
+        let json = serde_json::to_value(graph.violations)?;
+        Ok(json)
+    }
 }

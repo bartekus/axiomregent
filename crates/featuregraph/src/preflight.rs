@@ -34,9 +34,20 @@ pub struct PreflightRequest {
     pub snapshot_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SafetyTier {
+    #[serde(rename = "tier1")]
+    Tier1, // Autonomous
+    #[serde(rename = "tier2")]
+    Tier2, // Gated
+    #[serde(rename = "tier3")]
+    Tier3, // Forbidden
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PreflightResponse {
     pub allowed: bool,
+    pub safety_tier: SafetyTier,
     pub violations: Vec<Violation>,
     pub graph_fingerprint: String,
 }
@@ -62,6 +73,11 @@ impl PreflightChecker {
         let mut violations = Vec::new();
         let known_features: HashSet<&String> =
             graph.features.iter().map(|f| &f.feature_id).collect();
+
+        // 1. Check Policy Violations
+        self.check_policy_violations(req, &mut violations);
+
+        // 2. Check Feature Graph Consistency
 
         for rel_path in &req.changed_paths {
             let abs_path = self.root.join(rel_path);
@@ -132,13 +148,57 @@ impl PreflightChecker {
         }
 
         violations.sort_by(|a, b| a.code.cmp(&b.code).then(a.path.cmp(&b.path)));
-        let allowed = violations.is_empty();
+
+        let safety_tier = self.calculate_safety_tier(req, &violations);
+
+        // Tier 3 is never allowed
+        let allowed = violations.is_empty() && safety_tier != SafetyTier::Tier3;
 
         Ok(PreflightResponse {
             allowed,
+            safety_tier,
             violations,
             graph_fingerprint: graph.graph_fingerprint.clone(),
         })
+    }
+
+    fn check_policy_violations(&self, req: &PreflightRequest, violations: &mut Vec<Violation>) {
+        for path in &req.changed_paths {
+            // Policy: Do not edit generated files
+            if path.contains("generated/") || path.ends_with(".gen.rs") {
+                violations.push(Violation {
+                    code: "EDIT_GENERATED_FILE".to_string(),
+                    severity: "error".to_string(),
+                    path: path.clone(),
+                    feature_id: None,
+                    message: "Manual edits to generated files are forbidden".to_string(),
+                    suggested_fix: Some("Modify the source generator instead".to_string()),
+                });
+            }
+        }
+    }
+
+    fn calculate_safety_tier(
+        &self,
+        req: &PreflightRequest,
+        violations: &[Violation],
+    ) -> SafetyTier {
+        // If there are any errors or Forbidden violations, it's Tier 3
+        if violations.iter().any(|v| v.severity == "error") {
+            return SafetyTier::Tier3;
+        }
+
+        // Tier 1: Documentation only changes
+        let all_docs = req.changed_paths.iter().all(|p| {
+            p.ends_with(".md") || p.ends_with(".txt") || p.ends_with(".png") || p.ends_with(".jpg")
+        });
+
+        if all_docs {
+            return SafetyTier::Tier1;
+        }
+
+        // Tier 2: Code changes (Default)
+        SafetyTier::Tier2
     }
 }
 

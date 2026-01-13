@@ -165,6 +165,33 @@ impl Router {
                                 "required": ["repo_root"]
                             }
                         },
+                        // Governance Tools
+                        {
+                            "name": "gov.preflight",
+                            "description": "Check governance policy for proposed changes",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "repo_root": { "type": "string" },
+                                    "intent": { "type": "string", "enum": ["edit", "create", "delete", "refactor"] },
+                                    "mode": { "type": "string", "enum": ["worktree", "snapshot"] },
+                                    "changed_paths": { "type": "array", "items": { "type": "string" } },
+                                    "snapshot_id": { "type": "string" }
+                                },
+                                "required": ["repo_root", "intent", "mode", "changed_paths"]
+                            }
+                        },
+                        {
+                            "name": "gov.drift",
+                            "description": "Check for drift and violations",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "repo_root": { "type": "string" }
+                                },
+                                "required": ["repo_root"]
+                            }
+                        },
                         // Snapshot Tools
                         {
                             "name": "snapshot.list",
@@ -452,6 +479,43 @@ impl Router {
                             .featuregraph_tools
                             .features_locate(repo_root, feature_id, spec_path, file_path)
                         {
+                            Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
+                            Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                        }
+                    }
+
+                    "gov.preflight" => {
+                        let repo_root = match args.get("repo_root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => {
+                                return json_rpc_error(
+                                    req.id.clone(),
+                                    -32602,
+                                    "repo_root required",
+                                );
+                            }
+                        };
+
+                        match self
+                            .featuregraph_tools
+                            .governance_preflight(repo_root, Value::Object(args.clone()))
+                        {
+                            Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
+                            Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                        }
+                    }
+                    "gov.drift" => {
+                        let repo_root = match args.get("repo_root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => {
+                                return json_rpc_error(
+                                    req.id.clone(),
+                                    -32602,
+                                    "repo_root required",
+                                );
+                            }
+                        };
+                        match self.featuregraph_tools.governance_drift(repo_root) {
                             Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
                             Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
                         }
