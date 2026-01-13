@@ -8,7 +8,7 @@ features:
   - id: MCP_ROUTER
     title: "Core MCP Router & Dispatch"
     governance: approved
-    implementation: todo
+    implementation: implemented
     spec: "spec/core/router.md"
     owner: core-team
     group: core
@@ -18,7 +18,7 @@ features:
   - id: MCP_SNAPSHOT_WORKSPACE
     title: "Snapshot & Workspace Tools"
     governance: approved
-    implementation: todo
+    implementation: implemented
     spec: "spec/core/snapshot-workspace.md"
     owner: core-team
     group: core
@@ -38,7 +38,7 @@ features:
   - id: GOVERNANCE_ENGINE
     title: "Governance Engine (Preflight & Drift)"
     governance: approved
-    implementation: todo
+    implementation: implemented
     spec: "spec/core/governance.md"
     owner: core-team
     group: core
@@ -49,7 +49,7 @@ features:
   - id: XRAY_ANALYSIS
     title: "Xray Repository Analysis"
     governance: approved
-    implementation: todo
+    implementation: implemented
     spec: "spec/xray/analysis.md"
     owner: analysis-team
     group: analysis
@@ -59,7 +59,7 @@ features:
   - id: ANTIGRAVITY_AUTOMATION
     title: "Antigravity Automation Agent"
     governance: approved
-    implementation: todo
+    implementation: implemented
     spec: "spec/antigravity/automation.md"
     owner: automation-team
     group: automation

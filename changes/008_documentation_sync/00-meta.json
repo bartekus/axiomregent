@@ -1,0 +1,7 @@
+{
+  "changeset_id": "008_documentation_sync",
+  "created_at": "2026-01-13T12:15:00Z",
+  "subject": "Sync documentation with implementation state",
+  "goal": "Resolve discrepancies in features.yaml and changeset documentation.",
+  "status": "planned"
+}
