@@ -28,7 +28,7 @@ features:
   - id: FEATUREGRAPH_REGISTRY
     title: "Feature Graph Registry & Lookup"
     governance: approved
-    implementation: todo
+    implementation: implemented
     spec: "spec/core/featuregraph.md"
     owner: core-team
     group: core

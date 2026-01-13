@@ -32,7 +32,14 @@ fn test_mcp_tools_list() {
     let snapshot_tools = Arc::new(SnapshotTools::new(lease_store.clone(), store.clone()));
     let workspace_tools = Arc::new(WorkspaceTools::new(lease_store.clone(), store.clone()));
 
-    let router = Router::new(resolver, mounts, snapshot_tools, workspace_tools);
+    let featuregraph_tools = Arc::new(axiomregent::featuregraph::tools::FeatureGraphTools::new());
+    let router = Router::new(
+        resolver,
+        mounts,
+        snapshot_tools,
+        workspace_tools,
+        featuregraph_tools,
+    );
 
     // Test tools/list
     let req = JsonRpcRequest {
@@ -73,7 +80,14 @@ fn test_mcp_tools_call_validation() {
     let snapshot_tools = Arc::new(SnapshotTools::new(lease_store.clone(), store.clone()));
     let workspace_tools = Arc::new(WorkspaceTools::new(lease_store.clone(), store.clone()));
 
-    let router = Router::new(resolver, mounts, snapshot_tools, workspace_tools);
+    let featuregraph_tools = Arc::new(axiomregent::featuregraph::tools::FeatureGraphTools::new());
+    let router = Router::new(
+        resolver,
+        mounts,
+        snapshot_tools,
+        workspace_tools,
+        featuregraph_tools,
+    );
 
     // Call resolve_mcp without name -> Error
     let req = JsonRpcRequest {

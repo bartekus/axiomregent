@@ -29,11 +29,26 @@ pub struct Violation {
 pub struct FeatureNode {
     /// The unique identifier for the feature (e.g., "MCP_ROUTER").
     pub feature_id: String,
+    /// The human-readable title of the feature.
+    #[serde(default)]
+    pub title: String,
     /// The path to the feature's specification file.
     pub spec_path: String,
-    /// The current status of the feature (e.g., "approved", "pending").
+    /// The current implementation status of the feature.
     #[serde(default)]
     pub status: String,
+    /// The governance status (e.g. "approved").
+    #[serde(default)]
+    pub governance: String,
+    /// The team that owns this feature.
+    #[serde(default)]
+    pub owner: String,
+    /// The logical group this feature belongs to.
+    #[serde(default)]
+    pub group: String,
+    /// List of feature IDs that this feature depends on.
+    #[serde(default)]
+    pub depends_on: Vec<String>,
     /// List of source files that implement this feature.
     pub impl_files: Vec<String>,
     /// List of test files that verify this feature.

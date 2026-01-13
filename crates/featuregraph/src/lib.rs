@@ -7,3 +7,4 @@ pub mod graph;
 pub mod locate;
 pub mod preflight;
 pub mod scanner;
+pub mod tools;

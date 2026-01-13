@@ -32,6 +32,48 @@
       }
     },
     {
+      "name": "features.overview",
+      "description": "Get full feature graph",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "snapshot_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root"
+        ]
+      }
+    },
+    {
+      "name": "features.locate",
+      "description": "Locate feature definition or impl",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "feature_id": {
+            "type": "string"
+          },
+          "spec_path": {
+            "type": "string"
+          },
+          "file_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root"
+        ]
+      }
+    },
+    {
       "name": "snapshot.list",
       "description": "List files in a snapshot or worktree",
       "inputSchema": {

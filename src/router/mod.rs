@@ -13,6 +13,7 @@ use crate::router::mounts::MountRegistry;
 use crate::snapshot::lease::StaleLeaseError;
 use crate::snapshot::tools::SnapshotTools;
 use crate::workspace::WorkspaceTools;
+use featuregraph::tools::FeatureGraphTools;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -84,6 +85,7 @@ pub struct Router {
     mounts: MountRegistry,
     snapshot_tools: Arc<SnapshotTools>,
     workspace_tools: Arc<WorkspaceTools>,
+    featuregraph_tools: Arc<FeatureGraphTools>,
 }
 
 impl Router {
@@ -92,12 +94,14 @@ impl Router {
         mounts: MountRegistry,
         snapshot_tools: Arc<SnapshotTools>,
         workspace_tools: Arc<WorkspaceTools>,
+        featuregraph_tools: Arc<FeatureGraphTools>,
     ) -> Self {
         Self {
             resolver,
             mounts,
             snapshot_tools,
             workspace_tools,
+            featuregraph_tools,
         }
     }
 
@@ -133,6 +137,33 @@ impl Router {
                             "name": "get_capabilities",
                             "description": "Get server capabilities",
                             "inputSchema": { "type": "object", "properties": {} }
+                        },
+                        // FeatureGraph Tools
+                        {
+                            "name": "features.overview",
+                            "description": "Get full feature graph",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "repo_root": { "type": "string" },
+                                    "snapshot_id": { "type": "string" }
+                                },
+                                "required": ["repo_root"]
+                            }
+                        },
+                        {
+                            "name": "features.locate",
+                            "description": "Locate feature definition or impl",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "repo_root": { "type": "string" },
+                                    "feature_id": { "type": "string" },
+                                    "spec_path": { "type": "string" },
+                                    "file_path": { "type": "string" }
+                                },
+                                "required": ["repo_root"]
+                            }
                         },
                         // Snapshot Tools
                         {
@@ -366,6 +397,64 @@ impl Router {
                             req.id.clone(),
                             json!({ "content": [{ "type": "json", "json": caps }] }),
                         )
+                    }
+
+                    // --- FeatureGraph Tools ---
+                    "features.overview" => {
+                        let repo_root = match args.get("repo_root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => {
+                                return json_rpc_error(
+                                    req.id.clone(),
+                                    -32602,
+                                    "repo_root required",
+                                );
+                            }
+                        };
+                        let snapshot_id = args
+                            .get("snapshot_id")
+                            .and_then(|v| v.as_str())
+                            .map(String::from);
+
+                        match self
+                            .featuregraph_tools
+                            .features_overview(repo_root, snapshot_id)
+                        {
+                            Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
+                            Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                        }
+                    }
+                    "features.locate" => {
+                        let repo_root = match args.get("repo_root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => {
+                                return json_rpc_error(
+                                    req.id.clone(),
+                                    -32602,
+                                    "repo_root required",
+                                );
+                            }
+                        };
+                        let feature_id = args
+                            .get("feature_id")
+                            .and_then(|v| v.as_str())
+                            .map(String::from);
+                        let spec_path = args
+                            .get("spec_path")
+                            .and_then(|v| v.as_str())
+                            .map(String::from);
+                        let file_path = args
+                            .get("file_path")
+                            .and_then(|v| v.as_str())
+                            .map(String::from);
+
+                        match self
+                            .featuregraph_tools
+                            .features_locate(repo_root, feature_id, spec_path, file_path)
+                        {
+                            Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
+                            Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                        }
                     }
 
                     // --- Snapshot Tools Call Handlers ---

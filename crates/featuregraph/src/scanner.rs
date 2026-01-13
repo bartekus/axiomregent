@@ -137,7 +137,12 @@ struct FeaturesYaml {
 #[derive(Debug, Deserialize)]
 struct FeatureEntry {
     id: String,
+    title: String,
     spec: String,
+    governance: String,
+    owner: String,
+    group: String,
+    depends_on: Vec<String>,
     implementation: Option<String>,
 }
 
@@ -181,8 +186,13 @@ impl Scanner {
                 entry.id.clone(),
                 FeatureNode {
                     feature_id: entry.id.clone(),
+                    title: entry.title.clone(),
                     spec_path: entry.spec.clone(),
                     status: entry.implementation.clone().unwrap_or_default(),
+                    governance: entry.governance.clone(),
+                    owner: entry.owner.clone(),
+                    group: entry.group.clone(),
+                    depends_on: entry.depends_on.clone(),
                     impl_files: Vec::new(),
                     test_files: Vec::new(),
                     violations: Vec::new(),
