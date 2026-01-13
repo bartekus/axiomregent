@@ -14,8 +14,8 @@ Antigravity enables autonomous agents to safely propose and execute changes with
 
 ## Artifacts
 - **`00-meta.json`**: Canonical identity & immutable context.
-- **`01-architecture.md`**: Reasoning and high-level design.
-- **`02-implementation-plan.json`**: Machine-readable, deterministic execution graph.
+- **`00-meta.json`**: Canonical identity & immutable context.
+- **`01-implementation_plan.md`**: Reasoning, design, and execution graph.
 - **`04-walkthrough.md`**: Proof of execution, including logs and results.
 - **`05-status.json`**: Executor-managed state (not written by Agent).
 

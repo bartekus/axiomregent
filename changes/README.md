@@ -8,8 +8,7 @@ Each subdirectory represents a distinct changeset, named by its deterministic `c
 
 Inside each changeset directory:
 - `00-meta.json`: Canonical identity and context.
-- `01-architecture.md`: Reasoning and design.
-- `02-implementation-plan.json`: Execution graph.
+- `01-implementation_plan.md`: Execution graph / Implementation Plan.
 - `04-walkthrough.md`: Execution record and results.
 - `05-status.json`: Current state of the changeset.
 
