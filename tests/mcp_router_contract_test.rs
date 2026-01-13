@@ -39,7 +39,13 @@ fn test_router_contract_routing() {
     let snapshot_tools = Arc::new(SnapshotTools::new(lease_store.clone(), store.clone()));
     let workspace_tools = Arc::new(WorkspaceTools::new(lease_store.clone(), store.clone()));
     let featuregraph_tools = Arc::new(axiomregent::featuregraph::tools::FeatureGraphTools::new());
+    let feature_tools = Arc::new(axiomregent::feature_tools::FeatureTools::new());
     let xray_tools = Arc::new(axiomregent::xray::tools::XrayTools::new());
+    let antigravity_tools = Arc::new(axiomregent::antigravity_tools::AntigravityTools::new(
+        workspace_tools.clone(),
+        snapshot_tools.clone(),
+        feature_tools.clone(),
+    ));
 
     let router = Router::new(
         resolver,
@@ -48,6 +54,7 @@ fn test_router_contract_routing() {
         workspace_tools,
         featuregraph_tools,
         xray_tools,
+        antigravity_tools,
     );
 
     // 1. Unknown Method -> Error -32601

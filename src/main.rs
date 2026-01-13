@@ -61,7 +61,13 @@ fn main() -> Result<()> {
         store.clone(),
     ));
     let featuregraph_tools = Arc::new(axiomregent::featuregraph::tools::FeatureGraphTools::new());
+    let feature_tools = Arc::new(axiomregent::feature_tools::FeatureTools::new());
     let xray_tools = Arc::new(axiomregent::xray::tools::XrayTools::new());
+    let antigravity_tools = Arc::new(axiomregent::antigravity_tools::AntigravityTools::new(
+        workspace_tools.clone(),
+        snapshot_tools.clone(),
+        feature_tools.clone(),
+    ));
 
     // 4. Setup Router
     let router = Router::new(
@@ -71,6 +77,7 @@ fn main() -> Result<()> {
         workspace_tools,
         featuregraph_tools,
         xray_tools,
+        antigravity_tools,
     );
 
     // 4. Stdio Loop (MCP framing)

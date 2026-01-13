@@ -3,10 +3,10 @@
 // Feature: MCP_ROUTER
 // Spec: spec/core/router.md
 
-// pub mod antigravity_tools;
+pub mod antigravity_tools;
 pub mod config;
-// pub mod feature_tools;
-// pub mod internal_client;
+pub mod feature_tools;
+pub mod internal_client;
 pub mod io;
 pub mod protocol;
 pub mod resolver;

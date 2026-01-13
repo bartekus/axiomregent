@@ -33,7 +33,13 @@ fn test_mcp_tools_list() {
     let workspace_tools = Arc::new(WorkspaceTools::new(lease_store.clone(), store.clone()));
 
     let featuregraph_tools = Arc::new(axiomregent::featuregraph::tools::FeatureGraphTools::new());
+    let feature_tools = Arc::new(axiomregent::feature_tools::FeatureTools::new());
     let xray_tools = Arc::new(axiomregent::xray::tools::XrayTools::new());
+    let antigravity_tools = Arc::new(axiomregent::antigravity_tools::AntigravityTools::new(
+        workspace_tools.clone(),
+        snapshot_tools.clone(),
+        feature_tools.clone(),
+    ));
     let router = Router::new(
         resolver,
         mounts,
@@ -41,6 +47,7 @@ fn test_mcp_tools_list() {
         workspace_tools,
         featuregraph_tools,
         xray_tools,
+        antigravity_tools,
     );
 
     // Test tools/list
@@ -57,7 +64,7 @@ fn test_mcp_tools_list() {
     let tools = res["tools"].as_array().expect("tools should be an array");
 
     // Check for required tools
-    let required_tools = vec!["resolve_mcp", "list_mounts"];
+    let required_tools = vec!["resolve_mcp", "list_mounts", "antigravity.propose"];
     for req_tool in required_tools {
         let found = tools.iter().any(|t| t["name"] == req_tool);
         assert!(found, "Tool {} not found", req_tool);
@@ -83,7 +90,13 @@ fn test_mcp_tools_call_validation() {
     let workspace_tools = Arc::new(WorkspaceTools::new(lease_store.clone(), store.clone()));
 
     let featuregraph_tools = Arc::new(axiomregent::featuregraph::tools::FeatureGraphTools::new());
+    let feature_tools = Arc::new(axiomregent::feature_tools::FeatureTools::new());
     let xray_tools = Arc::new(axiomregent::xray::tools::XrayTools::new());
+    let antigravity_tools = Arc::new(axiomregent::antigravity_tools::AntigravityTools::new(
+        workspace_tools.clone(),
+        snapshot_tools.clone(),
+        feature_tools.clone(),
+    ));
     let router = Router::new(
         resolver,
         mounts,
@@ -91,6 +104,7 @@ fn test_mcp_tools_call_validation() {
         workspace_tools,
         featuregraph_tools,
         xray_tools,
+        antigravity_tools,
     );
 
     // Call resolve_mcp without name -> Error
