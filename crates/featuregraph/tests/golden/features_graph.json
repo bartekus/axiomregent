@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.0",
+  "graph_fingerprint": "sha256:fe5c015ae7c2d49b1e7a919c86d6d2346d620b205fa35d0afd38b0d75871a4db",
+  "features": [
+    {
+      "feature_id": "ANTIGRAVITY_AUTOMATION",
+      "spec_path": "spec/antigravity/automation.md",
+      "status": "done",
+      "impl_files": [],
+      "test_files": [],
+      "violations": []
+    },
+    {
+      "feature_id": "AXIOMREGENT_RUN_SKILLS",
+      "spec_path": "spec/run/skills.md",
+      "status": "done",
+      "impl_files": [],
+      "test_files": [],
+      "violations": []
+    },
+    {
+      "feature_id": "FEATUREGRAPH_REGISTRY",
+      "spec_path": "spec/core/featuregraph.md",
+      "status": "done",
+      "impl_files": [],
+      "test_files": [],
+      "violations": []
+    },
+    {
+      "feature_id": "GOVERNANCE_ENGINE",
+      "spec_path": "spec/core/governance.md",
+      "status": "done",
+      "impl_files": [],
+      "test_files": [],
+      "violations": []
+    },
+    {
+      "feature_id": "MCP_ROUTER",
+      "spec_path": "spec/core/router.md",
+      "status": "done",
+      "impl_files": [],
+      "test_files": [],
+      "violations": []
+    },
+    {
+      "feature_id": "MCP_SNAPSHOT_WORKSPACE",
+      "spec_path": "spec/core/snapshot-workspace.md",
+      "status": "done",
+      "impl_files": [],
+      "test_files": [],
+      "violations": []
+    },
+    {
+      "feature_id": "XRAY_ANALYSIS",
+      "spec_path": "spec/xray/analysis.md",
+      "status": "done",
+      "impl_files": [],
+      "test_files": [],
+      "violations": []
+    }
+  ],
+  "violations": [
+    {
+      "code": "DANGLING_FEATURE_ID",
+      "severity": "error",
+      "path": "src/router/mod.rs",
+      "feature_id": "MCP_TOOLS",
+      "message": "Feature MCP_TOOLS not found in registry",
+      "suggested_fix": "Add feature to spec/features.yaml"
+    }
+  ]
+}
