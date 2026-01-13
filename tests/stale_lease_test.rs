@@ -76,6 +76,7 @@ fn test_stale_lease_error_structure() {
     let snapshot_tools = Arc::new(SnapshotTools::new(lease_store.clone(), store.clone()));
     let workspace_tools = Arc::new(WorkspaceTools::new(lease_store.clone(), store.clone()));
     let featuregraph_tools = Arc::new(axiomregent::featuregraph::tools::FeatureGraphTools::new());
+    let xray_tools = Arc::new(axiomregent::xray::tools::XrayTools::new());
 
     let router = Router::new(
         resolver,
@@ -83,6 +84,7 @@ fn test_stale_lease_error_structure() {
         snapshot_tools,
         workspace_tools,
         featuregraph_tools,
+        xray_tools,
     );
 
     // 1. Get a lease via snapshot.list (worktree mode)

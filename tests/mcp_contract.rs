@@ -30,12 +30,14 @@ fn test_mcp_tools_list_contract() {
     let snapshot_tools = Arc::new(SnapshotTools::new(lease_store.clone(), store.clone()));
     let workspace_tools = Arc::new(WorkspaceTools::new(lease_store.clone(), store.clone()));
     let featuregraph_tools = Arc::new(axiomregent::featuregraph::tools::FeatureGraphTools::new());
+    let xray_tools = Arc::new(axiomregent::xray::tools::XrayTools::new());
     let router = Router::new(
         resolver,
         mounts,
         snapshot_tools,
         workspace_tools,
         featuregraph_tools,
+        xray_tools,
     );
 
     // 2. Call tools/list

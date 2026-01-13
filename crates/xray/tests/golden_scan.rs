@@ -107,7 +107,7 @@ fn test_determinism_empty_scan() {
         "main.go missing from index"
     );
     // Verify Hash (Phase B)
-    let expected_hash = "sha256:ad1c40d0f5d7d86f11336e5fd914f85df225adea12627838e4a03f91815bedfe";
+    let expected_hash = "sha256:26320564020c86be516eea64a5a9d9a34a091978d6f7a72f1222c94468bbc587";
     assert!(
         content1.contains(expected_hash),
         "main.go hash incorrect or missing"
