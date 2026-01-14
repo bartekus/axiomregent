@@ -7,7 +7,7 @@ use crate::feature_tools::{FeatureTools, PreflightMode, PreflightRequest};
 use crate::snapshot::tools::SnapshotTools;
 use crate::workspace::WorkspaceTools;
 use antigravity::validator::McpClient;
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -39,6 +39,35 @@ impl McpClient for InternalClient {
         // mode "check" usually
         let violations = self.features.drift(&self.repo_root, None)?;
         Ok(!violations.is_empty())
+    }
+
+    fn get_drift(&self, exclude_prefix: Option<&str>) -> Result<Vec<String>> {
+        // Use git status --porcelain to find modified files
+        let output = std::process::Command::new("git")
+            .arg("status")
+            .arg("--porcelain")
+            .current_dir(&self.repo_root)
+            .output()
+            .context("Failed to run git status")?;
+
+        if !output.status.success() {
+            return Err(anyhow!("git status failed"));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut violations = Vec::new();
+        for line in stdout.lines() {
+            // Line format: "XY PATH"
+            // XY are status codes.
+            if line.len() > 3 {
+                let path = line[3..].to_string();
+                if exclude_prefix.is_some_and(|prefix| path.starts_with(prefix)) {
+                    continue;
+                }
+                violations.push(path);
+            }
+        }
+        Ok(violations)
     }
 
     fn impact(&self, _mode: &str, changed_paths: Vec<String>) -> Result<String> {

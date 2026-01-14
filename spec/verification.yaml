@@ -1,0 +1,74 @@
+# spec/verification.yaml
+version: 1
+
+# Optional toolchain checks. These run before any verification skills in a profile.
+toolchains:
+  rust:
+    required:
+      - cmd: ["cargo", "--version"]
+      - cmd: ["rustc", "--version"]
+      - cmd: ["rustfmt", "--version"]
+      - cmd: ["clippy-driver", "--version"]
+
+defaults:
+  workdir: "."
+  timeout_ms: 600000
+  network: "deny"          # deny | allow
+  read_only: "tracked"     # off | tracked | strict
+  env_allowlist:
+    - "CI"
+    - "RUST_LOG"
+    - "RUST_BACKTRACE"
+    - "CARGO_TERM_COLOR"
+  env:
+    CARGO_TERM_COLOR: "always"
+
+profiles:
+  pr:
+    include:
+      - verify.format.check
+#      - verify.lint
+#      - verify.test.fast
+
+skills:
+  verify.format.check:
+    description: "Rust formatting check (no tracked writes)."
+    determinism: "D0"
+    tier: 1
+    steps:
+      - name: "cargo_fmt_check"
+        cmd: ["cargo", "fmt", "--check"]
+        timeout_ms: 180000
+        read_only: "tracked"
+        network: "deny"
+
+  verify.lint:
+    description: "Rust lint via clippy (warnings are errors)."
+    determinism: "D1"
+    tier: 2
+    steps:
+      - name: "cargo_clippy"
+        cmd:
+          [
+            "cargo",
+            "clippy",
+            "--all-targets",
+            "--all-features",
+            "--",
+            "-D",
+            "warnings"
+          ]
+        timeout_ms: 900000
+        read_only: "tracked"
+        network: "deny"
+
+  verify.test.fast:
+    description: "Fast Rust test suite (unit tests, default features)."
+    determinism: "D1"
+    tier: 2
+    steps:
+      - name: "cargo_test"
+        cmd: ["cargo", "test"]
+        timeout_ms: 1800000
+        read_only: "tracked"
+        network: "deny"

@@ -10,3 +10,4 @@ pub mod id;
 pub mod safety;
 pub mod schemas;
 pub mod validator;
+pub mod verification;

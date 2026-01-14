@@ -367,6 +367,19 @@ impl Router {
                                 "required": ["repo_root", "changeset_id"]
                             }
                         },
+                        {
+                            "name": "antigravity.verify",
+                            "description": "Verify a changeset",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "repo_root": { "type": "string" },
+                                    "changeset_id": { "type": "string" },
+                                    "profile": { "type": "string" }
+                                },
+                                "required": ["repo_root", "changeset_id"]
+                            }
+                        },
                         // Workspace Tools
                         {
                             "name": "workspace.write_file",
@@ -654,6 +667,37 @@ impl Router {
                         };
 
                         match self.antigravity_tools.execute(repo_root, changeset_id) {
+                            Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
+                            Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                        }
+                    }
+                    "antigravity.verify" => {
+                        let repo_root = match args.get("repo_root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => {
+                                return json_rpc_error(
+                                    req.id.clone(),
+                                    -32602,
+                                    "repo_root required",
+                                );
+                            }
+                        };
+                        let changeset_id = match args.get("changeset_id").and_then(|v| v.as_str()) {
+                            Some(v) => v,
+                            None => {
+                                return json_rpc_error(
+                                    req.id.clone(),
+                                    -32602,
+                                    "changeset_id required",
+                                );
+                            }
+                        };
+                        let profile = args.get("profile").and_then(|v| v.as_str()).unwrap_or("pr");
+
+                        match self
+                            .antigravity_tools
+                            .verify(repo_root, changeset_id, profile)
+                        {
                             Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
                             Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
                         }

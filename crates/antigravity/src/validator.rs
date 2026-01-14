@@ -12,6 +12,7 @@ use std::path::Path;
 pub trait McpClient {
     fn preflight(&self, mode: &str) -> Result<bool>;
     fn drift(&self, mode: &str) -> Result<bool>; // true if drift exists
+    fn get_drift(&self, exclude_prefix: Option<&str>) -> Result<Vec<String>>;
     fn impact(&self, mode: &str, changed_paths: Vec<String>) -> Result<String>; // "high", "low", etc.
     fn call_tool(&self, name: &str, args: &serde_json::Value) -> Result<serde_json::Value>;
 }
@@ -166,6 +167,7 @@ impl Validator {
                         error: None,
                         log: vec![],
                     },
+                    verification: None,
                 })
             }
             Err(e) => Ok(fail_with_results(
@@ -203,6 +205,7 @@ fn fail(name: &str, msg: &str) -> ChangesetStatusV1 {
             error: None,
             log: vec![],
         },
+        verification: None,
     }
 }
 
@@ -229,5 +232,6 @@ fn fail_with_results(
             error: None,
             log: vec![],
         },
+        verification: None,
     }
 }

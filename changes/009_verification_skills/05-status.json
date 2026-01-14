@@ -1,0 +1,21 @@
+{
+  "schema_version": "v1",
+  "state": "executed",
+  "validation": {
+    "state": "valid",
+    "checks": []
+  },
+  "execution": {
+    "state": "completed",
+    "steps_completed": 5,
+    "error": null,
+    "log": []
+  },
+  "verification": {
+      "last_run": {
+          "profile": "pr",
+          "outcome": "passed",
+          "timestamp": "2026-01-13T16:00:00Z"
+      }
+  }
+}
