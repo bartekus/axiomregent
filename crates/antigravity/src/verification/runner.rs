@@ -6,9 +6,7 @@
 use crate::verification::config::{Cmd, NetworkMode, StepConfig};
 use anyhow::{Context, Result, anyhow};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
-use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -129,7 +127,7 @@ impl ConstrainedRunner {
         // Let's use `process_child_with_timeout` helper if possible.
         // Since we are writing std code:
 
-        let mut child = cmd.spawn().context("Failed to spawn command")?;
+        let child = cmd.spawn().context("Failed to spawn command")?;
         let timeout = Duration::from_millis(step.timeout_ms.unwrap_or(600_000));
 
         // Simple timeout implementation:

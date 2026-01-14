@@ -61,10 +61,8 @@ impl McpClient for InternalClient {
             // XY are status codes.
             if line.len() > 3 {
                 let path = line[3..].to_string();
-                if let Some(prefix) = exclude_prefix {
-                    if path.starts_with(prefix) {
-                        continue;
-                    }
+                if exclude_prefix.is_some_and(|prefix| path.starts_with(prefix)) {
+                    continue;
                 }
                 violations.push(path);
             }

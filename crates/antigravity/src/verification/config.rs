@@ -104,31 +104,21 @@ pub enum Cmd {
     Argv(Vec<String>),
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum NetworkMode {
+    #[default]
     Deny,
     Allow,
 }
 
-impl Default for NetworkMode {
-    fn default() -> Self {
-        NetworkMode::Deny
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ReadOnlyMode {
     Off,
+    #[default]
     Tracked,
     Strict,
-}
-
-impl Default for ReadOnlyMode {
-    fn default() -> Self {
-        ReadOnlyMode::Tracked
-    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

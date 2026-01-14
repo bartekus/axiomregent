@@ -111,22 +111,22 @@ skills:
 
     // Commit all files to make repo clean
     std::process::Command::new("git")
-        .args(&["config", "user.email", "test@example.com"])
+        .args(["config", "user.email", "test@example.com"])
         .current_dir(&repo_root)
         .output()
         .expect("Failed to set user.email");
     std::process::Command::new("git")
-        .args(&["config", "user.name", "Test User"])
+        .args(["config", "user.name", "Test User"])
         .current_dir(&repo_root)
         .output()
         .expect("Failed to set user.name");
     std::process::Command::new("git")
-        .args(&["add", "."])
+        .args(["add", "."])
         .current_dir(&repo_root)
         .output()
         .expect("Failed to git add");
     std::process::Command::new("git")
-        .args(&["commit", "-m", "Initial"])
+        .args(["commit", "-m", "Initial"])
         .current_dir(&repo_root)
         .output()
         .expect("Failed to git commit");

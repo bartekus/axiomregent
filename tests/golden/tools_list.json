@@ -451,6 +451,28 @@
       }
     },
     {
+      "name": "antigravity.verify",
+      "description": "Verify a changeset",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo_root": {
+            "type": "string"
+          },
+          "changeset_id": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_root",
+          "changeset_id"
+        ]
+      }
+    },
+    {
       "name": "workspace.write_file",
       "description": "Write file content",
       "inputSchema": {

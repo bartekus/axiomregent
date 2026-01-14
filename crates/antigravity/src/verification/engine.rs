@@ -3,22 +3,16 @@
 // Feature: VERIFICATION_SKILLS
 // Spec: spec/verification.yaml
 
-use crate::schemas::{
-    ChangesetMetaV1, ChangesetStatusV1, ExecutionStatus, ImplementationPlanV1, ValidationResult,
-    ValidationStatus, VerificationRunInfo, VerificationSummary,
-};
+use crate::schemas::{ChangesetStatusV1, VerificationRunInfo, VerificationSummary};
 use crate::validator::{McpClient, Validator};
-use crate::verification::config::{
-    Cmd, DeterminismClass, NetworkMode, ReadOnlyMode, VerificationConfig,
-};
+use crate::verification::config::{Cmd, ReadOnlyMode, VerificationConfig};
 use crate::verification::runner::{ConstrainedRunner, StepResult};
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::path::Path;
 
 #[derive(Serialize, Deserialize)]
 pub struct VerifyResultArtifact {
@@ -101,7 +95,7 @@ impl VerifyEngine {
         // Just run default "rust" toolchain if present? Or all?
         // Let's assume we run all defined toolchains for evidence.
         if !config.toolchains.is_empty() {
-            for (_, tc) in &config.toolchains {
+            for tc in config.toolchains.values() {
                 for check in &tc.required {
                     let step_cfg = crate::verification::config::StepConfig {
                         name: "toolchain_check".to_string(), // Dummy name
@@ -144,7 +138,7 @@ impl VerifyEngine {
             let exclude_prefix = format!("changes/{}/verify", changeset_id);
 
             // Check drift before
-            let drift_before = client.get_drift(Some(&exclude_prefix))?;
+            let _drift_before = client.get_drift(Some(&exclude_prefix))?;
 
             // Snapshot before - we can't easily get it without client method?
             // Let's use placeholder or skip.
@@ -160,13 +154,11 @@ impl VerifyEngine {
                 let drift_after_step = client.get_drift(Some(&exclude_prefix))?;
 
                 let ro_mode = step.read_only.unwrap_or(config.defaults.read_only);
-                if ro_mode != ReadOnlyMode::Off {
-                    if !drift_after_step.is_empty() {
-                        overall_success = false;
-                        // Mark exit code as failing if drift occurred in RO mode
-                        if skill_exit == 0 {
-                            skill_exit = 1;
-                        }
+                if ro_mode != ReadOnlyMode::Off && !drift_after_step.is_empty() {
+                    overall_success = false;
+                    // Mark exit code as failing if drift occurred in RO mode
+                    if skill_exit == 0 {
+                        skill_exit = 1;
                     }
                 }
 
