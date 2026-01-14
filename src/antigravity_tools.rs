@@ -81,4 +81,28 @@ impl AntigravityTools {
             "walkthrough": walkthrough
         }))
     }
+
+    pub fn verify(&self, repo_root: &Path, changeset_id: &str, profile: &str) -> Result<Value> {
+        let root = repo_root.canonicalize()?;
+
+        let client = InternalClient {
+            repo_root: root.clone(),
+            workspace: self.workspace.clone(),
+            snapshot: self.snapshot.clone(),
+            features: self.features.clone(),
+        };
+
+        antigravity::verification::engine::VerifyEngine::run(
+            &root,
+            changeset_id,
+            profile,
+            &client,
+        )?;
+
+        Ok(json!({
+            "changeset_id": changeset_id,
+            "profile": profile,
+            "status": "verified"
+        }))
+    }
 }

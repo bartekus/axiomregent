@@ -133,6 +133,7 @@ impl Executor {
                                 error: Some(format!("Tool failed: {}", e)),
                                 log: job_log,
                             },
+                            verification: None,
                         };
                         Validator::write_status(changeset_path, &final_status)?;
                         bail!("Tool execution failed: {}", e);
@@ -153,6 +154,7 @@ impl Executor {
                     error: Some("Post-execution drift detected".to_string()),
                     log: job_log,
                 },
+                verification: None,
             };
             Validator::write_status(changeset_path, &final_status)?;
             bail!("Post-execution drift detected");
@@ -172,6 +174,7 @@ impl Executor {
                 error: None,
                 log: job_log,
             },
+            verification: None,
         };
         Validator::write_status(changeset_path, &final_status)?;
 

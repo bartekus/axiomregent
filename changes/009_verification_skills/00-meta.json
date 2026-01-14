@@ -1,0 +1,9 @@
+{
+  "schema_version": "v1",
+  "change_set_id": "009_verification_skills",
+  "base_state_created_at": "2026-01-13T12:00:00Z",
+  "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "repo_key": "bartekus/axiomregent",
+  "base_state": "HEAD",
+  "intent": "edit"
+}

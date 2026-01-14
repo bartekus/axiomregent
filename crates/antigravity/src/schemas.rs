@@ -44,6 +44,19 @@ pub struct ChangesetStatusV1 {
     pub state: String, // pending_validation, validated, approved, executed, failed
     pub validation: ValidationStatus,
     pub execution: ExecutionStatus,
+    pub verification: Option<VerificationSummary>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct VerificationSummary {
+    pub last_run: VerificationRunInfo,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct VerificationRunInfo {
+    pub profile: String,
+    pub outcome: String,
+    pub timestamp: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
