@@ -74,7 +74,7 @@ features:
     spec: "spec/run/skills.md"
     owner: cli-team
     group: run
-    tests: ["crates/run/src/skills/mod.rs"]
+    tests: ["crates/run/src/skills/mod.rs", "tests/run_streaming_test.rs"]
     depends_on: []
   # --- Encore Integration ---
   - id: ENCORE_TS_INTEGRATION
