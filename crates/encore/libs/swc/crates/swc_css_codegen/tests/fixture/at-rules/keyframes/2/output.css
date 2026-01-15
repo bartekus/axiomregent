@@ -1,0 +1,8 @@
+@keyframes "foo" {
+  from {
+    transform: translatex(0%);
+  }
+  to {
+    transform: translatex(100%);
+  }
+}

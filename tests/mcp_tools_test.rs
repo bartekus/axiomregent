@@ -40,6 +40,7 @@ fn test_mcp_tools_list() {
         snapshot_tools.clone(),
         feature_tools.clone(),
     ));
+    let encore_tools = Arc::new(axiomregent::tools::encore_ts::tools::EncoreTools::new());
     let router = Router::new(
         resolver,
         mounts,
@@ -48,6 +49,7 @@ fn test_mcp_tools_list() {
         featuregraph_tools,
         xray_tools,
         antigravity_tools,
+        encore_tools,
     );
 
     // Test tools/list
@@ -97,6 +99,7 @@ fn test_mcp_tools_call_validation() {
         snapshot_tools.clone(),
         feature_tools.clone(),
     ));
+    let encore_tools = Arc::new(axiomregent::tools::encore_ts::tools::EncoreTools::new());
     let router = Router::new(
         resolver,
         mounts,
@@ -105,6 +108,7 @@ fn test_mcp_tools_call_validation() {
         featuregraph_tools,
         xray_tools,
         antigravity_tools,
+        encore_tools,
     );
 
     // Call resolve_mcp without name -> Error

@@ -34,6 +34,8 @@ fn create_router() -> Router {
         feature_tools.clone(),
     ));
 
+    let encore_tools = Arc::new(axiomregent::tools::encore_ts::tools::EncoreTools::new());
+
     Router::new(
         resolver,
         mounts,
@@ -42,6 +44,7 @@ fn create_router() -> Router {
         featuregraph_tools,
         xray_tools,
         antigravity_tools,
+        encore_tools,
     )
 }
 

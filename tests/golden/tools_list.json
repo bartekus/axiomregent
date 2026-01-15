@@ -473,6 +473,98 @@
       }
     },
     {
+      "name": "encore.ts.env.check",
+      "description": "Check Encore TS environment",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "encore.ts.parse",
+      "description": "Parse Encore TS application",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "root": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "root"
+        ]
+      }
+    },
+    {
+      "name": "encore.ts.meta",
+      "description": "Get Encore TS application metadata",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "root": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "root"
+        ]
+      }
+    },
+    {
+      "name": "encore.ts.run.start",
+      "description": "Start Encore TS application",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "env": {
+            "type": "object"
+          },
+          "profile": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "root"
+        ]
+      }
+    },
+    {
+      "name": "encore.ts.run.stop",
+      "description": "Stop Encore TS application",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id"
+        ]
+      }
+    },
+    {
+      "name": "encore.ts.logs.stream",
+      "description": "Stream logs from Encore TS application",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "from_seq": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run_id"
+        ]
+      }
+    },
+    {
       "name": "workspace.write_file",
       "description": "Write file content",
       "inputSchema": {

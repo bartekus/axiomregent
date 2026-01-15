@@ -76,3 +76,13 @@ features:
     group: run
     tests: ["crates/run/src/skills/mod.rs"]
     depends_on: []
+  # --- Encore Integration ---
+  - id: ENCORE_TS_INTEGRATION
+    title: "Encore TypeScript Toolchain"
+    governance: approved
+    implementation: in_progress
+    spec: "spec/core/tools.md" # Placeholder, implies tooling specs
+    owner: core-team
+    group: integrations
+    tests: ["src/tools/encore_ts/tools.rs"]
+    depends_on: ["MCP_ROUTER"]
