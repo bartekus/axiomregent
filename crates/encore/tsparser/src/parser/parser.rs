@@ -60,12 +60,7 @@ impl ParseContext {
         cm: Lrc<SourceMap>,
         errs: Lrc<Handler>,
     ) -> Result<Self> {
-        let resolver = NodeModulesResolver::with_export_conditions(
-            TargetEnv::Node,
-            Default::default(),
-            true,
-            vec!["bun".into(), "deno".into(), "types".into()],
-        );
+        let resolver = NodeModulesResolver::new(TargetEnv::Node, Default::default(), true);
         Self::with_resolver(app_root, js_runtime_path, resolver, cm, errs)
     }
 

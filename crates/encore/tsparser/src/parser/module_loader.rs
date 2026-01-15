@@ -58,8 +58,8 @@ pub enum Error {
     UnableToResolve(String, #[source] anyhow::Error),
     #[error("invalid filename {0}")]
     InvalidFilename(FileName),
-    #[error("unable to load file from filesystem")]
-    LoadFile(#[source] io::Error),
+    #[error("unable to load file from filesystem: {0}")]
+    LoadFile(PathBuf, #[source] io::Error),
     #[error("error when parsing module")]
     ParseError(swc_ecma_parser::error::Error),
 }
@@ -67,7 +67,7 @@ pub enum Error {
 impl Error {
     pub fn span(&self) -> Option<Span> {
         match self {
-            Error::UnableToResolve(..) | Error::InvalidFilename(_) | Error::LoadFile(_) => None,
+            Error::UnableToResolve(..) | Error::InvalidFilename(_) | Error::LoadFile(..) => None,
             Error::ParseError(e) => Some(e.span()),
         }
     }
@@ -77,7 +77,8 @@ impl Error {
             Error::UnableToResolve(s, source) => {
                 format!("unable to resolve module {s}: {source:?}")
             }
-            Error::InvalidFilename(_) | Error::LoadFile(_) => self.to_string(),
+            Error::InvalidFilename(_) => self.to_string(),
+            Error::LoadFile(..) => self.to_string(),
             Error::ParseError(e) => e.clone().into_kind().msg().to_string(),
         }
     }
@@ -141,7 +142,7 @@ impl ModuleLoader {
                 .resolver
                 .resolve(from_file, import_path)
                 .map_err(|err| Error::UnableToResolve(import_path.to_string(), err))?;
-            match mod_path {
+            match mod_path.filename {
                 FileName::Real(ref buf) => {
                     if let Some(ext) = buf.extension().and_then(OsStr::to_str) {
                         if !MODULE_EXTENSIONS.contains(&ext) {
@@ -164,7 +165,7 @@ impl ModuleLoader {
                     FilePath::Real(buf.clone())
                 }
                 FileName::Custom(ref str) => FilePath::Custom(str.clone()),
-                _ => return Err(Error::InvalidFilename(mod_path)),
+                _ => return Err(Error::InvalidFilename(mod_path.filename)),
             }
         };
 
@@ -203,7 +204,10 @@ impl ModuleLoader {
             return Ok(module.clone());
         }
 
-        let file = self.file_set.load_file(path).map_err(Error::LoadFile)?;
+        let file = self
+            .file_set
+            .load_file(path)
+            .map_err(|e| Error::LoadFile(path.to_path_buf(), e))?;
         let module = self.parse_and_store(file, module_path)?;
         Ok(module)
     }
