@@ -28,3 +28,9 @@ The `axiomregent run` CLI executes high-level "skills" (workflows) that abstract
     - `--fail-on-warning`: Fail if warnings occur.
 - **State Management**: Persists run results to `.axiomregent/run` state directory.
 - **Determinism**: Execution order is stable (lexicographic).
+
+## MCP Integration & Observability
+The `run` crate capabilities are exposed via the MCP Router (`RunTools`), providing:
+- **Asynchronous Execution**: Skills run in background threads.
+- **Rich Status Reporting**: Status includes `running`, `completed` (with exit code 0), or `failed` (non-zero), along with `start_time` and `end_time` timestamps.
+- **Log Streaming**: Run logs are persisted to `.axiomregent/run/logs/<run_id>.log` and can be streamed via `run.logs` using `offset` and `limit` parameters for real-time monitoring.

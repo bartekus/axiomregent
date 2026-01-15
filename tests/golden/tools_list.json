@@ -605,6 +605,12 @@
         "properties": {
           "run_id": {
             "type": "string"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
           }
         },
         "required": [
