@@ -1,0 +1,9 @@
+.c::selection {
+  color: red;
+}
+::selection {
+  color: red;
+}
+::selection {
+  color: red;
+}

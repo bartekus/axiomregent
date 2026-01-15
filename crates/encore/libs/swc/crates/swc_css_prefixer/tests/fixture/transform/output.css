@@ -1,0 +1,72 @@
+.class {
+  -webkit-transform: rotate(30deg);
+  -moz-transform: rotate(30deg);
+  -ms-transform: rotate(30deg);
+  -o-transform: rotate(30deg);
+  transform: rotate(30deg);
+}
+a {
+  -webkit-transition: -webkit-transform 1s;
+  -moz-transition: -moz-transform 1s;
+  -o-transition: -o-transform 1s;
+  transition: -webkit-transform 1s;
+  transition: -moz-transform 1s;
+  transition: -o-transform 1s;
+  transition: transform 1s;
+  -webkit-transform: rotatex(45deg);
+  -moz-transform: rotatex(45deg);
+  transform: rotatex(45deg);
+}
+b {
+  -webkit-transform: translatex(45deg);
+  -moz-transform: translatex(45deg);
+  -ms-transform: translatex(45deg);
+  -o-transform: translatex(45deg);
+  transform: translatex(45deg);
+  -webkit-transform-origin: 0 0;
+  -moz-transform-origin: 0 0;
+  -ms-transform-origin: 0 0;
+  -o-transform-origin: 0 0;
+  transform-origin: 0 0;
+}
+em {
+  -webkit-transform: rotatez(45deg);
+  -moz-transform: rotatez(45deg);
+  transform: rotatez(45deg);
+}
+@-webkit-keyframes anim {
+  from {
+    -webkit-transform: rotate(90deg);
+    transform: rotate(90deg);
+  }
+}
+@-moz-keyframes anim {
+  from {
+    -moz-transform: rotate(90deg);
+    transform: rotate(90deg);
+  }
+}
+@-o-keyframes anim {
+  from {
+    -o-transform: rotate(90deg);
+    transform: rotate(90deg);
+  }
+}
+@keyframes anim {
+  from {
+    -webkit-transform: rotate(90deg);
+    -moz-transform: rotate(90deg);
+    -o-transform: rotate(90deg);
+    transform: rotate(90deg);
+  }
+}
+.class {
+  -webkit-transform-style: flat;
+  -moz-transform-style: flat;
+  transform-style: flat;
+}
+.class {
+  -webkit-transform: perspective(500px) rotatey(3deg);
+  -moz-transform: perspective(500px) rotatey(3deg);
+  transform: perspective(500px) rotatey(3deg);
+}

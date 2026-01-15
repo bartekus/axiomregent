@@ -68,6 +68,7 @@ fn main() -> Result<()> {
         snapshot_tools.clone(),
         feature_tools.clone(),
     ));
+    let encore_tools = Arc::new(axiomregent::tools::encore_ts::tools::EncoreTools::new());
 
     // 4. Setup Router
     let router = Router::new(
@@ -78,6 +79,7 @@ fn main() -> Result<()> {
         featuregraph_tools,
         xray_tools,
         antigravity_tools,
+        encore_tools,
     );
 
     // 4. Stdio Loop (MCP framing)

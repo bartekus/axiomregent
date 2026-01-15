@@ -1,0 +1,19 @@
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tonic_build::configure()
+        .build_server(true)
+        .build_client(true)
+        .compile_protos(
+            &[
+                "../vendors/encore/proto/encore/daemon/daemon.proto",
+                "../vendors/encore/proto/encore/engine/trace/trace.proto",
+                "../vendors/encore/proto/encore/engine/trace2/trace2.proto",
+                "../vendors/encore/proto/encore/parser/schema/v1/schema.proto",
+                "../vendors/encore/proto/encore/parser/meta/v1/meta.proto",
+                "../vendors/encore/proto/encore/runtime/v1/infra.proto",
+                "../vendors/encore/proto/encore/runtime/v1/runtime.proto",
+                "../vendors/encore/proto/encore/runtime/v1/secretdata.proto",
+            ],
+            &["../vendors/encore/proto"],
+        )?;
+    Ok(())
+}

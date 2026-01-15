@@ -39,6 +39,7 @@ fn test_mcp_tools_list_contract() {
         snapshot_tools.clone(),
         feature_tools.clone(),
     ));
+    let encore_tools = Arc::new(axiomregent::tools::encore_ts::tools::EncoreTools::new());
 
     let router = Router::new(
         resolver,
@@ -48,6 +49,7 @@ fn test_mcp_tools_list_contract() {
         featuregraph_tools,
         xray_tools,
         antigravity_tools,
+        encore_tools,
     );
 
     // 2. Call tools/list

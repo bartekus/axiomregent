@@ -13,6 +13,7 @@ use crate::resolver::order::ResolveEngine;
 use crate::router::mounts::MountRegistry;
 use crate::snapshot::lease::StaleLeaseError;
 use crate::snapshot::tools::SnapshotTools;
+use crate::tools::encore_ts::tools::EncoreTools;
 use crate::workspace::WorkspaceTools;
 use featuregraph::tools::FeatureGraphTools;
 use serde::{Deserialize, Serialize};
@@ -90,9 +91,11 @@ pub struct Router {
     featuregraph_tools: Arc<FeatureGraphTools>,
     xray_tools: Arc<XrayTools>,
     antigravity_tools: Arc<AntigravityTools>,
+    encore_tools: Arc<EncoreTools>,
 }
 
 impl Router {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         resolver: Arc<ResolveEngine<RealFs>>,
         mounts: MountRegistry,
@@ -101,6 +104,7 @@ impl Router {
         featuregraph_tools: Arc<FeatureGraphTools>,
         xray_tools: Arc<XrayTools>,
         antigravity_tools: Arc<AntigravityTools>,
+        encore_tools: Arc<EncoreTools>,
     ) -> Self {
         Self {
             resolver,
@@ -110,6 +114,7 @@ impl Router {
             featuregraph_tools,
             xray_tools,
             antigravity_tools,
+            encore_tools,
         }
     }
 
@@ -378,6 +383,70 @@ impl Router {
                                     "profile": { "type": "string" }
                                 },
                                 "required": ["repo_root", "changeset_id"]
+                            }
+                        },
+                        // Encore TS Tools
+                        {
+                            "name": "encore.ts.env.check",
+                            "description": "Check Encore TS environment",
+                            "inputSchema": { "type": "object", "properties": {} }
+                        },
+                        {
+                            "name": "encore.ts.parse",
+                            "description": "Parse Encore TS application",
+                             "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "root": { "type": "string" }
+                                },
+                                "required": ["root"]
+                            }
+                        },
+                        {
+                            "name": "encore.ts.meta",
+                            "description": "Get Encore TS application metadata",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "root": { "type": "string" }
+                                },
+                                "required": ["root"]
+                            }
+                        },
+                        {
+                            "name": "encore.ts.run.start",
+                            "description": "Start Encore TS application",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "root": { "type": "string" },
+                                    "env": { "type": "object" },
+                                    "profile": { "type": "string" }
+                                },
+                                "required": ["root"]
+                            }
+                        },
+                        {
+                            "name": "encore.ts.run.stop",
+                            "description": "Stop Encore TS application",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "run_id": { "type": "string" }
+                                },
+                                "required": ["run_id"]
+                            }
+                        },
+                        {
+                            "name": "encore.ts.logs.stream",
+                            "description": "Stream logs from Encore TS application",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "run_id": { "type": "string" },
+                                    "from_seq": { "type": "integer" }
+                                },
+                                "required": ["run_id"]
                             }
                         },
                         // Workspace Tools
@@ -701,6 +770,74 @@ impl Router {
                             Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
                             Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
                         }
+                    }
+
+                    // --- Encore TS Tools ---
+                    "encore.ts.env.check" => {
+                        handle_tool_result_value(req.id.clone(), self.encore_tools.env_check())
+                    }
+                    "encore.ts.parse" => {
+                        let root = match args.get("root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => return json_rpc_error(req.id.clone(), -32602, "root required"),
+                        };
+                        handle_tool_result_value(req.id.clone(), self.encore_tools.parse(root))
+                    }
+                    "encore.ts.meta" => {
+                        let root = match args.get("root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => return json_rpc_error(req.id.clone(), -32602, "root required"),
+                        };
+                        handle_tool_result_value(req.id.clone(), self.encore_tools.meta(root))
+                    }
+                    "encore.ts.run.start" => {
+                        let root = match args.get("root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => return json_rpc_error(req.id.clone(), -32602, "root required"),
+                        };
+                        // Note: env and profile parsing omitted for skeleton, just passing placeholders or improving later
+                        // Actually, I should parse them properly to match the signature.
+                        // But for now, let's keep it minimal as tools.rs implementation is just Err.
+                        // I'll assume Env is Option<HashMap<String, String>>
+                        // For now I'll just pass None for optional args to keep it simple in this skeleton phase.
+                        // Or better, let's just parse them if present.
+
+                        let env = args.get("env").and_then(|v| v.as_object()).map(|obj| {
+                            obj.iter()
+                                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                                .collect()
+                        });
+                        let profile = args
+                            .get("profile")
+                            .and_then(|v| v.as_str())
+                            .map(String::from);
+
+                        handle_tool_result_value(
+                            req.id.clone(),
+                            self.encore_tools.run_start(root, env, profile),
+                        )
+                    }
+                    "encore.ts.run.stop" => {
+                        let run_id = match args.get("run_id").and_then(|v| v.as_str()) {
+                            Some(v) => v,
+                            None => {
+                                return json_rpc_error(req.id.clone(), -32602, "run_id required");
+                            }
+                        };
+                        handle_tool_result_value(req.id.clone(), self.encore_tools.run_stop(run_id))
+                    }
+                    "encore.ts.logs.stream" => {
+                        let run_id = match args.get("run_id").and_then(|v| v.as_str()) {
+                            Some(v) => v,
+                            None => {
+                                return json_rpc_error(req.id.clone(), -32602, "run_id required");
+                            }
+                        };
+                        let from_seq = args.get("from_seq").and_then(|v| v.as_u64());
+                        handle_tool_result_value(
+                            req.id.clone(),
+                            self.encore_tools.logs_stream(run_id, from_seq),
+                        )
                     }
 
                     // --- Snapshot Tools Call Handlers ---

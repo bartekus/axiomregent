@@ -13,6 +13,7 @@ pub mod resolver;
 pub mod router;
 // pub mod skills;
 pub mod snapshot;
+pub mod tools;
 pub mod util;
 pub mod workspace;
 pub use featuregraph;
