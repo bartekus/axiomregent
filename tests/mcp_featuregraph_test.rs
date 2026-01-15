@@ -35,6 +35,8 @@ fn create_router() -> Router {
     ));
 
     let encore_tools = Arc::new(axiomregent::tools::encore_ts::tools::EncoreTools::new());
+    let root = std::env::current_dir().unwrap();
+    let run_tools = Arc::new(axiomregent::run_tools::RunTools::new(&root));
 
     Router::new(
         resolver,
@@ -45,6 +47,7 @@ fn create_router() -> Router {
         xray_tools,
         antigravity_tools,
         encore_tools,
+        run_tools,
     )
 }
 

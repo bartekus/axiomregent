@@ -40,6 +40,7 @@ fn test_mcp_tools_list_contract() {
         feature_tools.clone(),
     ));
     let encore_tools = Arc::new(axiomregent::tools::encore_ts::tools::EncoreTools::new());
+    let run_tools = Arc::new(axiomregent::run_tools::RunTools::new(dir.path()));
 
     let router = Router::new(
         resolver,
@@ -50,6 +51,7 @@ fn test_mcp_tools_list_contract() {
         xray_tools,
         antigravity_tools,
         encore_tools,
+        run_tools,
     );
 
     // 2. Call tools/list

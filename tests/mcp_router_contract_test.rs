@@ -47,6 +47,7 @@ fn test_router_contract_routing() {
         feature_tools.clone(),
     ));
     let encore_tools = Arc::new(axiomregent::tools::encore_ts::tools::EncoreTools::new());
+    let run_tools = Arc::new(axiomregent::run_tools::RunTools::new(dir.path()));
 
     let router = Router::new(
         resolver,
@@ -57,6 +58,7 @@ fn test_router_contract_routing() {
         xray_tools,
         antigravity_tools,
         encore_tools,
+        run_tools,
     );
 
     // 1. Unknown Method -> Error -32601

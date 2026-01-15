@@ -5,8 +5,10 @@
 
 use crate::state::{LastRun, SkillResult, SkillStatus, StateStore};
 use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex};
 
 pub trait Skill {
     fn id(&self) -> &str;
@@ -20,20 +22,38 @@ pub struct RunConfig {
     pub files0: bool,
     pub bin_path: String,
     pub stdin_buffer: Option<Vec<u8>>,
+    pub env: HashMap<String, String>,
 }
 
 pub struct Runner {
     registry: Vec<Box<dyn Skill>>,
     store: StateStore,
     config: RunConfig,
+    writer: Option<Arc<Mutex<Box<dyn Write + Send>>>>,
 }
 
 impl Runner {
-    pub fn new(registry: Vec<Box<dyn Skill>>, store: StateStore, config: RunConfig) -> Self {
+    pub fn new(
+        registry: Vec<Box<dyn Skill>>,
+        store: StateStore,
+        config: RunConfig,
+        writer: Option<Box<dyn Write + Send>>,
+    ) -> Self {
         Self {
             registry,
             store,
             config,
+            writer: writer.map(|w| Arc::new(Mutex::new(w))),
+        }
+    }
+
+    fn writeln(&self, msg: &str) {
+        if let Some(writer) = &self.writer {
+            if let Ok(mut w) = writer.lock() {
+                let _ = writeln!(w, "{}", msg);
+            }
+        } else {
+            println!("{}", msg);
         }
     }
 
@@ -41,10 +61,11 @@ impl Runner {
         if self.config.json {
             // TODO: Output JSON
             let ids: Vec<&str> = self.registry.iter().map(|s| s.id()).collect();
-            println!("{{ \"skills\": {:?} }}", ids);
+            let json = format!("{{ \"skills\": {:?} }}", ids);
+            self.writeln(&json);
         } else {
             for skill in &self.registry {
-                println!("{}", skill.id());
+                self.writeln(skill.id());
             }
         }
     }
@@ -70,7 +91,7 @@ impl Runner {
         let last_run = self.store.read_last_run()?;
         if let Some(last) = last_run {
             if last.failed.is_empty() {
-                println!("No failed skills to resume.");
+                self.writeln("No failed skills to resume.");
                 return Ok(true);
             }
             let mut to_run = Vec::new();
@@ -81,7 +102,7 @@ impl Runner {
             }
             self.execute_sequence(to_run)
         } else {
-            println!("No run state found.");
+            self.writeln("No run state found.");
             Ok(true)
         }
     }
@@ -96,9 +117,9 @@ impl Runner {
             skill_names.push(id.to_string());
 
             if !self.config.json {
-                println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                println!("SKILL: {}", id);
-                println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+                self.writeln("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                self.writeln(&format!("SKILL: {}", id));
+                self.writeln("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
             }
 
             let res = skill.run(&self.config)?;
@@ -108,9 +129,9 @@ impl Runner {
 
             if res.status == SkillStatus::Skip {
                 if !self.config.json {
-                    println!("SKIP: {}", id);
+                    self.writeln(&format!("SKIP: {}", id));
                     if let Some(note) = &res.note {
-                        println!("{}", note);
+                        self.writeln(note);
                     }
                 }
                 continue;
@@ -120,17 +141,15 @@ impl Runner {
                 failed.push(id.to_string());
                 overall_success = false;
                 if !self.config.json {
-                    println!("FAIL: {} (exit {})", id, res.exit_code);
+                    self.writeln(&format!("FAIL: {} (exit {})", id, res.exit_code));
                     if let Some(note) = &res.note {
-                        println!("{}", note);
+                        self.writeln(note);
                     }
                 }
-            } else {
-                if !self.config.json {
-                    println!("PASS: {}", id);
-                    if let Some(note) = &res.note {
-                        println!("{}", note);
-                    }
+            } else if !self.config.json {
+                self.writeln(&format!("PASS: {}", id));
+                if let Some(note) = &res.note {
+                    self.writeln(note);
                 }
             }
         }
@@ -147,7 +166,13 @@ impl Runner {
         self.store.write_last_run(&last_run)?;
 
         if !overall_success {
-            eprintln!("Run failed: {:?}", failed);
+            if let Some(writer) = &self.writer {
+                if let Ok(mut w) = writer.lock() {
+                    let _ = writeln!(w, "Run failed: {:?}", failed);
+                }
+            } else {
+                eprintln!("Run failed: {:?}", failed);
+            }
         }
 
         Ok(overall_success)
@@ -188,21 +213,32 @@ impl Skill for LegacySkill {
 
         cmd.arg("--state-dir").arg(&config.state_dir);
 
+        // Pass Env vars
+        cmd.envs(&config.env);
+
         // Capture stdout to read the JSON result from the bridge.
         // Inherit stderr so that logs and progress updates from the legacy runner are visible to the user.
         cmd.stdout(Stdio::piped());
+        // If we are capturing output, we might want to pipe stderr too to capture it?
+        // But LegacySkill uses the internal mechanism of the binary.
+        // The binary might write to stderr.
+        // If we want to capture that in our `writer`, we should probably pipe it and forward it.
+        // For now, keep it inherit for CLI usage. For MCP, we might lose it if we don't pipe.
+        // But `RunConfig` doesn't know if we are in MCP mode or not, other than `writer` existence.
+
+        // Let's stick with inherit for stderr for now as per original code,
+        // unless I want to improve log capture.
+        // If I change it to piped, I need to read it.
         cmd.stderr(Stdio::inherit());
 
         let mut child = cmd.spawn().context("spawning legacy skill")?;
 
-        if config.files0 {
-            if let Some(stdin_buf) = &config.stdin_buffer {
-                if let Some(mut stdin) = child.stdin.take() {
-                    stdin
-                        .write_all(stdin_buf)
-                        .context("writing to child stdin")?;
-                }
-            }
+        if let Some(stdin_buf) = config.stdin_buffer.as_ref().filter(|_| config.files0)
+            && let Some(mut stdin) = child.stdin.take()
+        {
+            stdin
+                .write_all(stdin_buf)
+                .context("writing to child stdin")?;
         }
 
         let output = child
@@ -210,10 +246,9 @@ impl Skill for LegacySkill {
             .context("waiting for legacy skill")?;
 
         // Parse stdout as SkillResult
-        if output.status.success() || output.status.code().unwrap_or(1) != 0 {
-            if let Ok(res) = serde_json::from_slice::<SkillResult>(&output.stdout) {
-                return Ok(res);
-            }
+        // Parse stdout as SkillResult
+        if let Ok(res) = serde_json::from_slice::<SkillResult>(&output.stdout) {
+            return Ok(res);
         }
 
         // If parsing failed or process crashed

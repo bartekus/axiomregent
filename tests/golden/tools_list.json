@@ -565,6 +565,54 @@
       }
     },
     {
+      "name": "run.execute",
+      "description": "Execute a run skill",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "skill": {
+            "type": "string"
+          },
+          "env": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "skill"
+        ]
+      }
+    },
+    {
+      "name": "run.status",
+      "description": "Get run status",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id"
+        ]
+      }
+    },
+    {
+      "name": "run.logs",
+      "description": "Get run logs",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id"
+        ]
+      }
+    },
+    {
       "name": "workspace.write_file",
       "description": "Write file content",
       "inputSchema": {

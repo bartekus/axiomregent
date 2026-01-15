@@ -11,6 +11,7 @@ use crate::io::fs::RealFs;
 use crate::antigravity_tools::AntigravityTools;
 use crate::resolver::order::ResolveEngine;
 use crate::router::mounts::MountRegistry;
+use crate::run_tools::RunTools;
 use crate::snapshot::lease::StaleLeaseError;
 use crate::snapshot::tools::SnapshotTools;
 use crate::tools::encore_ts::tools::EncoreTools;
@@ -92,6 +93,7 @@ pub struct Router {
     xray_tools: Arc<XrayTools>,
     antigravity_tools: Arc<AntigravityTools>,
     encore_tools: Arc<EncoreTools>,
+    run_tools: Arc<RunTools>,
 }
 
 impl Router {
@@ -105,6 +107,7 @@ impl Router {
         xray_tools: Arc<XrayTools>,
         antigravity_tools: Arc<AntigravityTools>,
         encore_tools: Arc<EncoreTools>,
+        run_tools: Arc<RunTools>,
     ) -> Self {
         Self {
             resolver,
@@ -115,6 +118,7 @@ impl Router {
             xray_tools,
             antigravity_tools,
             encore_tools,
+            run_tools,
         }
     }
 
@@ -445,6 +449,41 @@ impl Router {
                                 "properties": {
                                     "run_id": { "type": "string" },
                                     "from_seq": { "type": "integer" }
+                                },
+                                "required": ["run_id"]
+                            }
+                        },
+                        // Run Tools
+                        {
+                            "name": "run.execute",
+                            "description": "Execute a run skill",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "skill": { "type": "string" },
+                                    "env": { "type": "object" }
+                                },
+                                "required": ["skill"]
+                            }
+                        },
+                        {
+                            "name": "run.status",
+                            "description": "Get run status",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "run_id": { "type": "string" }
+                                },
+                                "required": ["run_id"]
+                            }
+                        },
+                        {
+                            "name": "run.logs",
+                            "description": "Get run logs",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "run_id": { "type": "string" }
                                 },
                                 "required": ["run_id"]
                             }
@@ -838,6 +877,56 @@ impl Router {
                             req.id.clone(),
                             self.encore_tools.logs_stream(run_id, from_seq),
                         )
+                    }
+
+                    // --- Run Tools ---
+                    "run.execute" => {
+                        let skill = match args.get("skill").and_then(|v| v.as_str()) {
+                            Some(v) => v.to_string(),
+                            None => {
+                                return json_rpc_error(req.id.clone(), -32602, "skill required");
+                            }
+                        };
+                        let env = args.get("env").and_then(|v| v.as_object()).map(|obj| {
+                            obj.iter()
+                                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                                .collect()
+                        });
+
+                        match self.run_tools.execute(skill, env) {
+                            Ok(val) => {
+                                handle_tool_result_value(req.id.clone(), Ok(Value::String(val)))
+                            }
+                            Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                        }
+                    }
+                    "run.status" => {
+                        let run_id = match args.get("run_id").and_then(|v| v.as_str()) {
+                            Some(v) => v,
+                            None => {
+                                return json_rpc_error(req.id.clone(), -32602, "run_id required");
+                            }
+                        };
+                        match self.run_tools.status(run_id) {
+                            Ok(val) => {
+                                handle_tool_result_value(req.id.clone(), Ok(Value::String(val)))
+                            }
+                            Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                        }
+                    }
+                    "run.logs" => {
+                        let run_id = match args.get("run_id").and_then(|v| v.as_str()) {
+                            Some(v) => v,
+                            None => {
+                                return json_rpc_error(req.id.clone(), -32602, "run_id required");
+                            }
+                        };
+                        match self.run_tools.logs(run_id) {
+                            Ok(val) => {
+                                handle_tool_result_value(req.id.clone(), Ok(Value::String(val)))
+                            }
+                            Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                        }
                     }
 
                     // --- Snapshot Tools Call Handlers ---

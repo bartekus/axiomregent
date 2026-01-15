@@ -28,18 +28,21 @@ impl Scanner {
         for result in walker {
             match result {
                 Ok(entry) => {
-                    if entry.file_type().map_or(false, |ft| ft.is_file()) {
+                    if entry.file_type().is_some_and(|ft| ft.is_file()) {
                         let path = entry.path();
-                        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                            if exts.contains(&ext) {
-                                // Return relative path if possible, or absolute?
-                                // Go scanner returns relative to root usually.
-                                // Let's return relative to root for consistency with Go.
-                                if let Ok(rel) = path.strip_prefix(&self.root) {
-                                    files.push(rel.to_path_buf());
-                                } else {
-                                    files.push(path.to_path_buf());
-                                }
+                        let is_match = path
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .is_some_and(|ext| exts.contains(&ext));
+
+                        if is_match {
+                            // Return relative path if possible, or absolute?
+                            // Go scanner returns relative to root usually.
+                            // Let's return relative to root for consistency with Go.
+                            if let Ok(rel) = path.strip_prefix(&self.root) {
+                                files.push(rel.to_path_buf());
+                            } else {
+                                files.push(path.to_path_buf());
                             }
                         }
                     }
