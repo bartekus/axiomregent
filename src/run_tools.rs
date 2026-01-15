@@ -1,0 +1,146 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026  Bartek Kus
+// Feature: AXIOMREGENT_RUN_SKILLS
+// Spec: spec/run/skills.md
+
+use anyhow::{Context, Result};
+use log::error;
+use run::{RunConfig, Runner, StateStore, registry};
+use std::collections::HashMap;
+use std::env;
+use std::fs::{self, File};
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use uuid::Uuid;
+
+pub struct RunTools {
+    runs: Arc<Mutex<HashMap<String, RunContext>>>,
+    state_dir: PathBuf,
+}
+
+#[derive(Clone)]
+struct RunContext {
+    status: String, // "pending", "running", "completed", "failed"
+    logs_path: PathBuf,
+}
+
+impl RunTools {
+    pub fn new(root: &Path) -> Self {
+        let state_dir = root.join(".axiomregent/run");
+        let logs_dir = state_dir.join("logs");
+        fs::create_dir_all(&logs_dir).unwrap_or(());
+
+        Self {
+            runs: Arc::new(Mutex::new(HashMap::new())),
+            state_dir,
+        }
+    }
+
+    pub fn execute(
+        &self,
+        skill: String,
+        env_vars: Option<HashMap<String, String>>,
+    ) -> Result<String> {
+        let run_id = Uuid::new_v4().to_string();
+        let logs_path = self.state_dir.join("logs").join(format!("{}.log", run_id));
+
+        let context = RunContext {
+            status: "pending".to_string(),
+            logs_path: logs_path.clone(),
+        };
+
+        {
+            let mut runs = self.runs.lock().unwrap();
+            runs.insert(run_id.clone(), context);
+        }
+
+        let runs_handle = self.runs.clone();
+        let run_id_clone = run_id.clone();
+        let state_dir_str = self.state_dir.to_string_lossy().into_owned();
+        let logs_path_clone = logs_path.clone();
+
+        thread::spawn(move || {
+            {
+                let mut runs = runs_handle.lock().unwrap();
+                if let Some(ctx) = runs.get_mut(&run_id_clone) {
+                    ctx.status = "running".to_string();
+                }
+            }
+
+            let log_file = match File::create(&logs_path_clone) {
+                Ok(f) => f,
+                Err(e) => {
+                    let mut runs = runs_handle.lock().unwrap();
+                    if let Some(ctx) = runs.get_mut(&run_id_clone) {
+                        ctx.status = "failed".to_string();
+                    }
+                    error!("Failed to create log file: {}", e);
+                    return;
+                }
+            };
+
+            // Setup RunConfig
+            let current_exe = env::current_exe().unwrap_or_else(|_| "axiomregent".into());
+            let bin_path = current_exe.to_string_lossy().into_owned();
+
+            let config = RunConfig {
+                json: false,
+                state_dir: state_dir_str.clone(),
+                fail_on_warning: false,
+                files0: false, // Not supported in remote execution yet
+                bin_path,
+                stdin_buffer: None,
+                env: env_vars.unwrap_or_default(),
+            };
+
+            let store = StateStore::new(&state_dir_str);
+            let registry = registry::get_registry();
+            let runner = Runner::new(registry, store, config, Some(Box::new(log_file)));
+
+            let result = runner.run_specific(&[skill]);
+
+            let mut runs = runs_handle.lock().unwrap();
+            if let Some(ctx) = runs.get_mut(&run_id_clone) {
+                match result {
+                    Ok(true) => ctx.status = "completed".to_string(),
+                    Ok(false) => ctx.status = "failed".to_string(),
+                    Err(_) => ctx.status = "failed".to_string(),
+                }
+            }
+        });
+
+        Ok(run_id)
+    }
+
+    pub fn status(&self, run_id: &str) -> Result<String> {
+        let runs = self.runs.lock().unwrap();
+        if let Some(ctx) = runs.get(run_id) {
+            Ok(ctx.status.clone())
+        } else {
+            Ok("unknown".to_string())
+        } // Or error? "unknown" is safer for JSON response
+    }
+
+    pub fn logs(&self, run_id: &str) -> Result<String> {
+        let logs_path = {
+            let runs = self.runs.lock().unwrap();
+            if let Some(ctx) = runs.get(run_id) {
+                ctx.logs_path.clone()
+            } else {
+                return Ok("Run ID not found".to_string());
+            }
+        };
+
+        if logs_path.exists() {
+            let mut file = File::open(logs_path).context("opening log file")?;
+            let mut contents = String::new();
+            file.read_to_string(&mut contents)
+                .context("reading log file")?;
+            Ok(contents)
+        } else {
+            Ok("".to_string())
+        }
+    }
+}

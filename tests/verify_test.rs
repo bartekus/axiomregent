@@ -49,6 +49,7 @@ fn test_antigravity_verify_flow() {
         feature_tools.clone(),
     ));
     let encore_tools = Arc::new(axiomregent::tools::encore_ts::tools::EncoreTools::new());
+    let run_tools = Arc::new(axiomregent::run_tools::RunTools::new(&repo_root));
     let router = Router::new(
         resolver,
         mounts,
@@ -58,6 +59,7 @@ fn test_antigravity_verify_flow() {
         xray_tools,
         antigravity_tools,
         encore_tools,
+        run_tools,
     );
 
     // 1. Setup Repo State

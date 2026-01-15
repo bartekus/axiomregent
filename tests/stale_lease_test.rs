@@ -86,6 +86,7 @@ fn test_stale_lease_error_structure() {
         feature_tools.clone(),
     ));
     let encore_tools = Arc::new(axiomregent::tools::encore_ts::tools::EncoreTools::new());
+    let run_tools = Arc::new(axiomregent::run_tools::RunTools::new(repo.path()));
 
     let router = Router::new(
         resolver,
@@ -96,6 +97,7 @@ fn test_stale_lease_error_structure() {
         xray_tools,
         antigravity_tools,
         encore_tools,
+        run_tools,
     );
 
     // 1. Get a lease via snapshot.list (worktree mode)

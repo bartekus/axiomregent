@@ -41,6 +41,8 @@ fn main() -> Result<()> {
         }
     };
 
+    let run_root = dirs.first().cloned().unwrap_or_else(|| PathBuf::from("."));
+
     let fs = RealFs;
     let resolver = Arc::new(ResolveEngine::new(fs, dirs));
 
@@ -69,6 +71,7 @@ fn main() -> Result<()> {
         feature_tools.clone(),
     ));
     let encore_tools = Arc::new(axiomregent::tools::encore_ts::tools::EncoreTools::new());
+    let run_tools = Arc::new(axiomregent::run_tools::RunTools::new(&run_root));
 
     // 4. Setup Router
     let router = Router::new(
@@ -80,6 +83,7 @@ fn main() -> Result<()> {
         xray_tools,
         antigravity_tools,
         encore_tools,
+        run_tools,
     );
 
     // 4. Stdio Loop (MCP framing)

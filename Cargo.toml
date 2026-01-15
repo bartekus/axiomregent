@@ -53,3 +53,6 @@ path = "crates/xray"
 
 [dependencies.antigravity]
 path = "crates/antigravity"
+
+[dependencies.run]
+path = "crates/run"

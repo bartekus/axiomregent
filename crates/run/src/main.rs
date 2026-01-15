@@ -8,12 +8,7 @@ use clap::{Parser, Subcommand};
 use std::env;
 use std::io::{self, Read};
 
-mod registry;
-mod runner;
-mod scanner;
-mod skills;
-mod state;
-
+use run::{registry, runner, state};
 use runner::{RunConfig, Runner};
 use state::StateStore;
 
@@ -96,11 +91,12 @@ fn main() -> Result<()> {
         files0: cli.files0,
         bin_path,
         stdin_buffer,
+        env: std::collections::HashMap::new(),
     };
 
     let store = StateStore::new(&config.state_dir);
     let registry = registry::get_registry();
-    let runner = Runner::new(registry, store, config);
+    let runner = Runner::new(registry, store, config, None);
 
     let success = match &cli.command {
         Some(Commands::List) => {
