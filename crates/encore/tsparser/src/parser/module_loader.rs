@@ -57,7 +57,7 @@ pub enum Error {
     #[error("unable to resolve module {0}")]
     UnableToResolve(String, #[source] anyhow::Error),
     #[error("invalid filename {0}")]
-    InvalidFilename(FileName),
+    InvalidFilename(FileName)
     #[error("unable to load file from filesystem: {0}")]
     LoadFile(PathBuf, #[source] io::Error),
     #[error("error when parsing module")]
@@ -142,6 +142,7 @@ impl ModuleLoader {
                 .resolver
                 .resolve(from_file, import_path)
                 .map_err(|err| Error::UnableToResolve(import_path.to_string(), err))?;
+
             match mod_path.filename {
                 FileName::Real(ref buf) => {
                     if let Some(ext) = buf.extension().and_then(OsStr::to_str) {
