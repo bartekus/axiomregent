@@ -22,6 +22,7 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 rusqlite = { version = "0.30", features = ["bundled"] }
 zstd = "0.13"
 tempfile = "3.8"
+chrono = { version = "0.4", features = ["serde"] }
 # Optional async runtime for future rmcp support
 tokio = { version = "1.0", features = ["full"], optional = true }
 similar = "2.7.0"

@@ -483,7 +483,9 @@ impl Router {
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "run_id": { "type": "string" }
+                                    "run_id": { "type": "string" },
+                                    "offset": { "type": "integer" },
+                                    "limit": { "type": "integer" }
                                 },
                                 "required": ["run_id"]
                             }
@@ -908,9 +910,7 @@ impl Router {
                             }
                         };
                         match self.run_tools.status(run_id) {
-                            Ok(val) => {
-                                handle_tool_result_value(req.id.clone(), Ok(Value::String(val)))
-                            }
+                            Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
                             Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
                         }
                     }
@@ -921,7 +921,9 @@ impl Router {
                                 return json_rpc_error(req.id.clone(), -32602, "run_id required");
                             }
                         };
-                        match self.run_tools.logs(run_id) {
+                        let offset = args.get("offset").and_then(|v| v.as_u64());
+                        let limit = args.get("limit").and_then(|v| v.as_u64());
+                        match self.run_tools.logs(run_id, offset, limit) {
                             Ok(val) => {
                                 handle_tool_result_value(req.id.clone(), Ok(Value::String(val)))
                             }

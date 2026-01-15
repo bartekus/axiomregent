@@ -4,12 +4,13 @@
 // Spec: spec/run/skills.md
 
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use log::error;
 use run::{RunConfig, Runner, StateStore, registry};
 use std::collections::HashMap;
 use std::env;
 use std::fs::{self, File};
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -24,6 +25,9 @@ pub struct RunTools {
 struct RunContext {
     status: String, // "pending", "running", "completed", "failed"
     logs_path: PathBuf,
+    start_time: Option<DateTime<Utc>>,
+    end_time: Option<DateTime<Utc>>,
+    exit_code: Option<i32>,
 }
 
 impl RunTools {
@@ -49,6 +53,9 @@ impl RunTools {
         let context = RunContext {
             status: "pending".to_string(),
             logs_path: logs_path.clone(),
+            start_time: Some(Utc::now()),
+            end_time: None,
+            exit_code: None,
         };
 
         {
@@ -75,6 +82,7 @@ impl RunTools {
                     let mut runs = runs_handle.lock().unwrap();
                     if let Some(ctx) = runs.get_mut(&run_id_clone) {
                         ctx.status = "failed".to_string();
+                        ctx.end_time = Some(Utc::now());
                     }
                     error!("Failed to create log file: {}", e);
                     return;
@@ -103,10 +111,20 @@ impl RunTools {
 
             let mut runs = runs_handle.lock().unwrap();
             if let Some(ctx) = runs.get_mut(&run_id_clone) {
+                ctx.end_time = Some(Utc::now());
                 match result {
-                    Ok(true) => ctx.status = "completed".to_string(),
-                    Ok(false) => ctx.status = "failed".to_string(),
-                    Err(_) => ctx.status = "failed".to_string(),
+                    Ok(true) => {
+                        ctx.status = "completed".to_string();
+                        ctx.exit_code = Some(0);
+                    }
+                    Ok(false) => {
+                        ctx.status = "failed".to_string();
+                        ctx.exit_code = Some(1);
+                    }
+                    Err(_) => {
+                        ctx.status = "failed".to_string();
+                        ctx.exit_code = Some(1);
+                    }
                 }
             }
         });
@@ -114,16 +132,21 @@ impl RunTools {
         Ok(run_id)
     }
 
-    pub fn status(&self, run_id: &str) -> Result<String> {
+    pub fn status(&self, run_id: &str) -> Result<serde_json::Value> {
         let runs = self.runs.lock().unwrap();
         if let Some(ctx) = runs.get(run_id) {
-            Ok(ctx.status.clone())
+            Ok(serde_json::json!({
+                "status": ctx.status,
+                "start_time": ctx.start_time,
+                "end_time": ctx.end_time,
+                "exit_code": ctx.exit_code
+            }))
         } else {
-            Ok("unknown".to_string())
-        } // Or error? "unknown" is safer for JSON response
+            Ok(serde_json::json!({ "status": "unknown" }))
+        }
     }
 
-    pub fn logs(&self, run_id: &str) -> Result<String> {
+    pub fn logs(&self, run_id: &str, offset: Option<u64>, limit: Option<u64>) -> Result<String> {
         let logs_path = {
             let runs = self.runs.lock().unwrap();
             if let Some(ctx) = runs.get(run_id) {
@@ -135,9 +158,24 @@ impl RunTools {
 
         if logs_path.exists() {
             let mut file = File::open(logs_path).context("opening log file")?;
+
+            if let Some(off) = offset {
+                file.seek(SeekFrom::Start(off))
+                    .context("seeking log file")?;
+            }
+
             let mut contents = String::new();
-            file.read_to_string(&mut contents)
-                .context("reading log file")?;
+            if let Some(lim) = limit {
+                // take() takes u64, read_to_string reads until limit.
+                let mut handle = file.take(lim);
+                handle
+                    .read_to_string(&mut contents)
+                    .context("reading log file")?;
+            } else {
+                file.read_to_string(&mut contents)
+                    .context("reading log file")?;
+            }
+
             Ok(contents)
         } else {
             Ok("".to_string())
