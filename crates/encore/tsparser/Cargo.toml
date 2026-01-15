@@ -1,7 +1,7 @@
 [package]
 name = "encore-tsparser"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [[bin]]
 name = "tsparser-encore"
@@ -30,7 +30,7 @@ chrono = "0.4.31"
 regex = "1.9.5"
 once_cell = "1.18.0"
 handlebars = { version = "4.4.0", features = ["no_logging"] }
-serde = { version = "1.0", features = ["rc", "derive"] }
+serde = { version = "1.0.188", features = ["rc"] }
 serde_json = { version = "1.0.107", features = ["preserve_order"] }
 url = "2.4.1"
 convert_case = "0.6.0"

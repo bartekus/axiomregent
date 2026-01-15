@@ -38,7 +38,7 @@ h2 = { workspace = true }
 lru = { workspace = true }
 clap = { version = "3.2.25", features = ["derive"] }
 once_cell = { workspace = true }
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.8"
 strum = "0.26.2"
 strum_macros = "0.26.2"

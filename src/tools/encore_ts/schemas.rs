@@ -5,7 +5,22 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MetaSnapshotV1 {
-    // TODO: Define fields
+    pub services: Vec<ServiceInfo>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ServiceInfo {
+    pub name: String,
+    pub description: Option<String>,
+    pub apis: Vec<ApiInfo>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ApiInfo {
+    pub name: String,
+    pub path: String,
+    pub method: String,
+    pub access: String, // "public", "private", "auth"
 }

@@ -3,4 +3,26 @@
 // Feature: ENCORE_TS_INTEGRATION
 // Spec: spec/core/encore_ts.md
 
-pub struct StateV1;
+use std::collections::HashMap;
+use std::process::Child;
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
+
+pub struct EncoreState {
+    pub processes: HashMap<String, RunProcess>,
+}
+
+pub struct RunProcess {
+    pub pid: u32,
+    pub start_time: SystemTime,
+    pub child: Child,
+    pub log_buffer: Arc<Mutex<Vec<String>>>, // Simplified log buffer
+}
+
+impl EncoreState {
+    pub fn new() -> Self {
+        Self {
+            processes: HashMap::new(),
+        }
+    }
+}
