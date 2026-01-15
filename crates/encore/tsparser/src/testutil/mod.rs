@@ -13,5 +13,9 @@ fn js_runtime_path() -> PathBuf {
         .stdout_capture()
         .read()
         .unwrap();
-    PathBuf::from(repo_root.trim()).join("runtimes").join("js")
+    PathBuf::from(repo_root.trim())
+        .join("crates")
+        .join("encore")
+        .join("runtimes")
+        .join("js")
 }

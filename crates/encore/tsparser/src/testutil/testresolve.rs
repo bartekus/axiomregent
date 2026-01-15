@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Error};
 use std::path::PathBuf;
 use swc_common::FileName;
-use swc_ecma_loader::resolve::Resolve;
+use swc_ecma_loader::resolve::{Resolution, Resolve};
 
 pub struct TestResolver {
     root_dir: PathBuf,
@@ -15,11 +15,14 @@ impl TestResolver {
 }
 
 impl Resolve for TestResolver {
-    fn resolve(&self, base: &FileName, module_specifier: &str) -> Result<FileName, Error> {
+    fn resolve(&self, base: &FileName, module_specifier: &str) -> Result<Resolution, Error> {
         // Fake the existence of the runtime module for now.
         if module_specifier.starts_with("encore.dev/") {
             let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("runtime")
+                .parent()
+                .unwrap()
+                .join("runtimes")
+                .join("js")
                 .join(
                     // Get the suffix after the "encore.dev/" part.
                     PathBuf::from(module_specifier)
@@ -27,7 +30,10 @@ impl Resolve for TestResolver {
                         .unwrap(),
                 );
             path.set_extension("ts");
-            return Ok(FileName::Real(path));
+            return Ok(Resolution {
+                filename: FileName::Real(path),
+                slug: None,
+            });
         }
 
         let base = match base {
@@ -47,7 +53,10 @@ impl Resolve for TestResolver {
         for file in &self.ar.files {
             let cleaned = clean_path::clean(self.root_dir.join(&file.name));
             if cleaned == path {
-                return Ok(FileName::Real(path));
+                return Ok(Resolution {
+                    filename: FileName::Real(path),
+                    slug: None,
+                });
             }
         }
         Err(anyhow!("import not found: {}", module_specifier))
@@ -57,7 +66,7 @@ impl Resolve for TestResolver {
 pub struct NoopResolver;
 
 impl Resolve for NoopResolver {
-    fn resolve(&self, _: &FileName, _: &str) -> Result<FileName, Error> {
+    fn resolve(&self, _: &FileName, _: &str) -> Result<Resolution, Error> {
         bail!("NoopResolver does not support resolving files");
     }
 }
@@ -82,7 +91,7 @@ export const Bar = 5;
 
         let base = FileName::Real("foo.ts".into());
         assert_eq!(
-            r.resolve(&base, "./bar.ts").unwrap(),
+            r.resolve(&base, "./bar.ts").unwrap().filename,
             FileName::Real("bar.ts".into())
         );
 
