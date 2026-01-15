@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright (C) 2026  Bartek Kus
+// Copyright (C) 2026 Bartek Kus
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Command, Stdio};

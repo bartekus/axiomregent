@@ -81,7 +81,7 @@ features:
     title: "Encore TypeScript Toolchain"
     governance: approved
     implementation: in_progress
-    spec: "spec/core/tools.md" # Placeholder, implies tooling specs
+    spec: "spec/core/encore_ts.md"
     owner: core-team
     group: integrations
     tests: ["src/tools/encore_ts/tools.rs"]
