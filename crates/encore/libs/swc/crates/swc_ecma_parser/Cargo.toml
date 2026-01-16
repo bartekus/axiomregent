@@ -1,13 +1,13 @@
 [package]
-authors       = ["강동윤 <kdy1997.dev@gmail.com>"]
-description   = "Feature-complete es2019 parser."
+authors = ["강동윤 <kdy1997.dev@gmail.com>"]
+description = "Feature-complete es2019 parser."
 documentation = "https://rustdoc.swc.rs/swc_ecma_parser/"
-edition       = "2021"
-include       = ["Cargo.toml", "src/**/*.rs", "examples/**/*.rs"]
-license       = "Apache-2.0"
-name          = "swc_ecma_parser"
-repository    = "https://github.com/swc-project/swc.git"
-version       = "0.141.21"
+edition = "2021"
+include = ["Cargo.toml", "src/**/*.rs", "examples/**/*.rs"]
+license = "Apache-2.0"
+name = "swc_ecma_parser"
+repository = "https://github.com/swc-project/swc.git"
+version = "0.141.21"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -18,33 +18,37 @@ bench = false
 
 [features]
 # Used for debugging
-debug      = []
-default    = ["typescript"]
+debug = []
+default = ["typescript"]
 typescript = []
-verify     = ["swc_ecma_visit"]
+verify = ["swc_ecma_visit"]
+
+serde-impl = []
+rkyv-impl = []
+__rkyv = []
 
 [dependencies]
-either      = { version = "1.4" }
-num-bigint  = "0.4"
-num-traits  = "0.2.15"
-serde       = { version = "1", features = ["derive"] }
-smallvec    = "1.8.0"
+either = { version = "1.4" }
+num-bigint = "0.4"
+num-traits = "0.2.15"
+serde = { version = "1", features = ["derive"] }
+smallvec = "1.8.0"
 smartstring = "1"
-tracing     = "0.1.37"
+tracing = "0.1.37"
 typed-arena = "2.0.1"
 
 new_debug_unreachable = "1.0.4"
-phf                   = { version = "0.11.2", features = ["macros"] }
-swc_atoms             = { version = "0.6.4", path = "../swc_atoms" }
-swc_common            = { version = "0.33.8", path = "../swc_common" }
-swc_ecma_ast          = { version = "0.110.9", path = "../swc_ecma_ast" }
-swc_ecma_visit        = { version = "0.96.9", path = "../swc_ecma_visit", optional = true }
+phf = { version = "0.11.2", features = ["macros"] }
+swc_atoms = { version = "0.6.4", path = "../swc_atoms" }
+swc_common = { version = "0.33.8", path = "../swc_common" }
+swc_ecma_ast = { version = "0.110.9", path = "../swc_ecma_ast" }
+swc_ecma_visit = { version = "0.96.9", path = "../swc_ecma_visit", optional = true }
 
 [dev-dependencies]
-criterion         = "0.5"
+criterion = "0.5"
 pretty_assertions = "1.3"
-serde_json        = "1"
-walkdir           = "2"
+serde_json = "1"
+walkdir = "2"
 
 swc_ecma_ast = { version = "0.110.9", path = "../swc_ecma_ast", features = [
   "serde-impl",
@@ -61,12 +65,12 @@ name = "typescript"
 
 [[bench]]
 harness = false
-name    = "compare"
+name = "compare"
 
 [[bench]]
 harness = false
-name    = "lexer"
+name = "lexer"
 
 [[bench]]
 harness = false
-name    = "parser"
+name = "parser"
