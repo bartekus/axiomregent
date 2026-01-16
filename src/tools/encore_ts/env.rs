@@ -14,9 +14,16 @@ pub struct EnvInfo {
 }
 
 pub fn check() -> Result<EnvInfo> {
-    let output = Command::new("encore").arg("version").output().context(
-        "Failed to execute 'encore version'. Ensure encore CLI is installed and in PATH.",
-    )?;
+    let output = match Command::new("encore").arg("version").output() {
+        Ok(o) => o,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(EnvInfo {
+                deployed: false,
+                version: String::new(),
+            });
+        }
+        Err(e) => return Err(e).context("Failed to execute 'encore version'")?,
+    };
 
     if !output.status.success() {
         return Ok(EnvInfo {
@@ -28,11 +35,20 @@ pub fn check() -> Result<EnvInfo> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     // output format example: "encore v1.35.0 (2024-03-22T15:27:06Z) macos-arm64"
     // or just "v1.35.0"
-    let version = stdout
-        .split_whitespace()
-        .next()
-        .unwrap_or("unknown")
-        .to_string();
+    let parts: Vec<&str> = stdout.split_whitespace().collect();
+    let version = if parts.first() == Some(&"encore") && parts.len() > 1 {
+        parts[1].to_string()
+    } else {
+        parts.first().unwrap_or(&"unknown").to_string()
+    };
+
+    // Also check for node
+    if Command::new("node").arg("--version").output().is_err() {
+        return Ok(EnvInfo {
+            deployed: false,
+            version: "Missing Node.js".to_string(), // Or handle differently
+        });
+    }
 
     Ok(EnvInfo {
         deployed: true,

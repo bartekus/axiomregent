@@ -22,6 +22,7 @@ pub struct RunProcess {
     #[serde(skip)]
     pub log_buffer: Arc<Mutex<Vec<String>>>, // Not serializable, re-create or ignore on load
     pub root_path: String, // Path to the app root
+    pub env: Option<HashMap<String, String>>,
 }
 
 impl EncoreState {

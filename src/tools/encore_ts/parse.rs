@@ -25,6 +25,7 @@ impl Emitter for CapturingEmitter {
     fn emit(&mut self, db: &DiagnosticBuilder<'_>) {
         // In a real implementation we might want to collect these.
         // For now, let's just log them as warnings.
+        eprintln!("Encore Parser Error: {}", db.message());
         log::warn!("Encore Parser: {}", db.message());
     }
 }
@@ -57,6 +58,10 @@ pub fn parse(root: &Path) -> Result<MetaSnapshotV1> {
             );
             let parser = Parser::new(&ctx, pass1);
             let result = parser.parse();
+
+            if handler.has_errors() {
+                anyhow::bail!("Encore TS parsing failed with errors");
+            }
 
             // Map ParseResult to MetaSnapshotV1
             let mut service_infos = Vec::new();

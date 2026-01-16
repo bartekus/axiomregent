@@ -4,9 +4,10 @@
 // Spec: spec/core/encore_ts.md
 
 use crate::tools::encore_ts::state::EncoreState;
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::io::BufRead;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -38,8 +39,6 @@ impl EncoreTools {
     }
 
     pub fn meta(&self, root: &Path) -> Result<Value> {
-        // Alias for parse? Or different? Spec says meta is not distinct but `encore.ts.parse` returns `MetaSnapshot`.
-        // The original stub had meta separately. Assuming alias or similar behavior as parse.
         self.parse(root)
     }
 
@@ -71,6 +70,7 @@ impl EncoreTools {
             .state
             .lock()
             .map_err(|e| anyhow!("State lock failed: {}", e))?;
+
         if let Some(process) = state.processes.get(run_id) {
             let buffer = process
                 .log_buffer
@@ -87,7 +87,28 @@ impl EncoreTools {
 
             Ok(serde_json::json!({ "logs": logs, "next_seq": next_seq }))
         } else {
-            Err(anyhow!("Process not found: {}", run_id))
+            // Try reading from disk for replay
+            let cwd = std::env::current_dir().context("Failed to get current directory")?;
+            let run_dir = cwd.join(".axiomregent").join("runs").join(run_id);
+            let logs_path = run_dir.join("logs.ndjson");
+
+            if logs_path.exists() {
+                let file = std::fs::File::open(&logs_path)?;
+                let reader = std::io::BufReader::new(file);
+                // We need to collect all lines to slice. Not efficient for huge files but ok for tool implementation baseline.
+                let lines: Result<Vec<String>, _> = reader.lines().collect();
+                let lines = lines.context("Failed to read logs lines")?;
+
+                let start_idx = from_seq.unwrap_or(0) as usize;
+                if start_idx >= lines.len() {
+                    return Ok(serde_json::json!({ "logs": [], "next_seq": lines.len() }));
+                }
+                let logs = lines[start_idx..].to_vec();
+                let next_seq = lines.len();
+                Ok(serde_json::json!({ "logs": logs, "next_seq": next_seq }))
+            } else {
+                Err(anyhow!("Process not found: {}", run_id))
+            }
         }
     }
 }
