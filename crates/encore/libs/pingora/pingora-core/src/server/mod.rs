@@ -15,21 +15,28 @@
 //! Server process and configuration management
 
 pub mod configuration;
+#[cfg(unix)]
 mod daemon;
+#[cfg(unix)]
 pub(crate) mod transfer_fd;
 
+#[cfg(unix)]
 use daemon::daemonize;
 use log::{debug, error, info, warn};
 use pingora_runtime::Runtime;
 use pingora_timeout::fast_timeout;
+#[cfg(feature = "sentry")]
+use sentry::ClientOptions;
 use std::sync::Arc;
 use std::thread;
+#[cfg(unix)]
 use tokio::signal::unix;
 use tokio::sync::{watch, Mutex};
 use tokio::time::{sleep, Duration};
 
 use crate::services::Service;
 use configuration::{Opt, ServerConf};
+#[cfg(unix)]
 pub use transfer_fd::Fds;
 
 use pingora_error::{Error, ErrorType, Result};
@@ -49,6 +56,7 @@ enum ShutdownType {
 /// The receiver for server's shutdown event. The value will turn to true once the server starts
 /// to shutdown
 pub type ShutdownWatch = watch::Receiver<bool>;
+#[cfg(unix)]
 pub type ListenFds = Arc<Mutex<Fds>>;
 
 /// The server object
@@ -58,23 +66,27 @@ pub type ListenFds = Arc<Mutex<Fds>>;
 /// zero downtime upgrade and error reporting.
 pub struct Server {
     services: Vec<Box<dyn Service>>,
+    #[cfg(unix)]
     listen_fds: Option<ListenFds>,
     shutdown_watch: watch::Sender<bool>,
     // TODO: we many want to drop this copy to let sender call closed()
     shutdown_recv: ShutdownWatch,
-    /// the parsed server configuration
+    /// The parsed server configuration
     pub configuration: Arc<ServerConf>,
-    /// the parser command line options
+    /// The parser command line options
     pub options: Option<Opt>,
-    /// the Sentry DSN
+    #[cfg(feature = "sentry")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sentry")))]
+    /// The Sentry ClientOptions.
     ///
-    /// Panics and other events sentry captures will send to this DSN **only in release mode**
-    pub sentry: Option<String>,
+    /// Panics and other events sentry captures will be sent to this DSN **only in release mode**
+    pub sentry: Option<ClientOptions>,
 }
 
 // TODO: delete the pid when exit
 
 impl Server {
+    #[cfg(unix)]
     async fn main_loop(&self) -> ShutdownType {
         // waiting for exit signal
         // TODO: there should be a signal handling function
@@ -115,7 +127,7 @@ impl Server {
                         Err(e) => {
                             error!("Unable to send listener sockets to new process: {e}");
                             // sentry log error on fd send failure
-                            #[cfg(not(debug_assertions))]
+                            #[cfg(all(not(debug_assertions), feature = "sentry"))]
                             sentry::capture_error(&e);
                         }
                     }
@@ -142,7 +154,7 @@ impl Server {
 
     fn run_service(
         mut service: Box<dyn Service>,
-        fds: Option<ListenFds>,
+        #[cfg(unix)] fds: Option<ListenFds>,
         shutdown: ShutdownWatch,
         threads: usize,
         work_stealing: bool,
@@ -152,12 +164,19 @@ impl Server {
     {
         let service_runtime = Server::create_runtime(service.name(), threads, work_stealing);
         service_runtime.get_handle().spawn(async move {
-            service.start_service(fds, shutdown).await;
+            service
+                .start_service(
+                    #[cfg(unix)]
+                    fds,
+                    shutdown,
+                )
+                .await;
             info!("service exited.")
         });
         service_runtime
     }
 
+    #[cfg(unix)]
     fn load_fds(&mut self, upgrade: bool) -> Result<(), nix::Error> {
         let mut fds = Fds::new();
         if upgrade {
@@ -175,21 +194,26 @@ impl Server {
     ///
     /// If a configuration file path is provided as part of `opt`, it will be ignored
     /// and a warning will be logged.
-    pub fn new_with_opt_and_conf(opt: Opt, mut conf: ServerConf) -> Server {
-        if let Some(c) = opt.conf.as_ref() {
-            warn!("Ignoring command line argument using '{c}' as configuration, and using provided configuration instead.");
+    pub fn new_with_opt_and_conf(raw_opt: impl Into<Option<Opt>>, mut conf: ServerConf) -> Server {
+        let opt = raw_opt.into();
+        if let Some(opts) = &opt {
+            if let Some(c) = opts.conf.as_ref() {
+                warn!("Ignoring command line argument using '{c}' as configuration, and using provided configuration instead.");
+            }
+            conf.merge_with_opt(opts);
         }
-        conf.merge_with_opt(&opt);
 
         let (tx, rx) = watch::channel(false);
 
         Server {
             services: vec![],
+            #[cfg(unix)]
             listen_fds: None,
             shutdown_watch: tx,
             shutdown_recv: rx,
             configuration: Arc::new(conf),
-            options: Some(opt),
+            options: opt,
+            #[cfg(feature = "sentry")]
             sentry: None,
         }
     }
@@ -200,7 +224,7 @@ impl Server {
     /// independent services.
     ///
     /// Command line options can either be passed by parsing the command line arguments via
-    /// `Opt::from_args()`, or be generated by other means.
+    /// `Opt::parse_args()`, or be generated by other means.
     pub fn new(opt: impl Into<Option<Opt>>) -> Result<Server> {
         let opt = opt.into();
         let (tx, rx) = watch::channel(false);
@@ -225,11 +249,13 @@ impl Server {
 
         Ok(Server {
             services: vec![],
+            #[cfg(unix)]
             listen_fds: None,
             shutdown_watch: tx,
             shutdown_recv: rx,
             configuration: Arc::new(conf),
             options: opt,
+            #[cfg(feature = "sentry")]
             sentry: None,
         })
     }
@@ -255,11 +281,8 @@ impl Server {
         debug!("{:#?}", self.options);
 
         /* only init sentry in release builds */
-        #[cfg(not(debug_assertions))]
-        let _guard = match self.sentry.as_ref() {
-            Some(uri) => Some(sentry::init(uri.as_str())),
-            None => None,
-        };
+        #[cfg(all(not(debug_assertions), feature = "sentry"))]
+        let _guard = self.sentry.as_ref().map(|opts| sentry::init(opts.clone()));
 
         if self.options.as_ref().map_or(false, |o| o.test) {
             info!("Server Test passed, exiting");
@@ -267,13 +290,14 @@ impl Server {
         }
 
         // load fds
+        #[cfg(unix)]
         match self.load_fds(self.options.as_ref().map_or(false, |o| o.upgrade)) {
             Ok(_) => {
                 info!("Bootstrap done");
             }
             Err(e) => {
                 // sentry log error on fd load failure
-                #[cfg(not(debug_assertions))]
+                #[cfg(all(not(debug_assertions), feature = "sentry"))]
                 sentry::capture_error(&e);
 
                 error!("Bootstrap failed on error: {:?}, exiting.", e);
@@ -294,6 +318,7 @@ impl Server {
 
         let conf = self.configuration.as_ref();
 
+        #[cfg(unix)]
         if conf.daemon {
             info!("Daemonizing the server");
             fast_timeout::pause_for_fork();
@@ -301,12 +326,14 @@ impl Server {
             fast_timeout::unpause();
         }
 
+        #[cfg(windows)]
+        if conf.daemon {
+            panic!("Daemonizing under windows is not supported");
+        }
+
         /* only init sentry in release builds */
-        #[cfg(not(debug_assertions))]
-        let _guard = match self.sentry.as_ref() {
-            Some(uri) => Some(sentry::init(uri.as_str())),
-            None => None,
-        };
+        #[cfg(all(not(debug_assertions), feature = "sentry"))]
+        let _guard = self.sentry.as_ref().map(|opts| sentry::init(opts.clone()));
 
         let mut runtimes: Vec<Runtime> = Vec::new();
 
@@ -314,6 +341,7 @@ impl Server {
             let threads = service.threads().unwrap_or(conf.threads);
             let runtime = Server::run_service(
                 service,
+                #[cfg(unix)]
                 self.listen_fds.clone(),
                 self.shutdown_recv.clone(),
                 threads,
@@ -325,7 +353,10 @@ impl Server {
         // blocked on main loop so that it runs forever
         // Only work steal runtime can use block_on()
         let server_runtime = Server::create_runtime("Server", 1, true);
+        #[cfg(unix)]
         let shutdown_type = server_runtime.get_handle().block_on(self.main_loop());
+        #[cfg(windows)]
+        let shutdown_type = ShutdownType::Graceful;
 
         if matches!(shutdown_type, ShutdownType::Graceful) {
             let exit_timeout = self

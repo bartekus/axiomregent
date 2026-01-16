@@ -28,7 +28,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use super::body::{BodyReader, BodyWriter};
 use super::common::*;
 use crate::protocols::http::HttpTask;
-use crate::protocols::{Digest, SocketAddr, Stream, UniqueID};
+use crate::protocols::{Digest, SocketAddr, Stream, UniqueID, UniqueIDType};
 use crate::utils::{BufRef, KVRef};
 
 /// The HTTP 1.x client session
@@ -639,7 +639,7 @@ impl HttpSession {
         &self.digest
     }
 
-    /// Return a mutable [Digest] reference for the connection, see [`digest`] for more details.
+    /// Return a mutable [Digest] reference for the connection.
     pub fn digest_mut(&mut self) -> &mut Digest {
         &mut self.digest
     }
@@ -663,6 +663,13 @@ impl HttpSession {
     /// Get the reference of the [Stream] that this HTTP session is operating upon.
     pub fn stream(&self) -> &Stream {
         &self.underlying_stream
+    }
+
+    /// Consume `self`, the underlying [Stream] will be returned and can be used
+    /// directly, for example, in the case of HTTP upgrade. It is not flushed
+    /// prior to being returned.
+    pub fn into_inner(self) -> Stream {
+        self.underlying_stream
     }
 }
 
@@ -717,7 +724,7 @@ pub(crate) fn http_req_header_to_wire(req: &RequestHeader) -> Option<BytesMut> {
 }
 
 impl UniqueID for HttpSession {
-    fn id(&self) -> i32 {
+    fn id(&self) -> UniqueIDType {
         self.underlying_stream.id()
     }
 }

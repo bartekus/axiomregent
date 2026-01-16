@@ -124,6 +124,9 @@ impl<SV> HttpProxy<SV> {
         session.upstream_compression.request_filter(&req);
         let body_empty = session.as_mut().is_body_empty();
 
+        // whether we support sending END_STREAM on HEADERS if body is empty
+        let send_end_stream = req.send_end_stream().expect("req must be h2");
+
         let mut req: http::request::Parts = req.into();
 
         // H2 requires authority to be set, so copy that from H1 host if that is set
@@ -133,27 +136,25 @@ impl<SV> HttpProxy<SV> {
             }
         }
 
-        debug!("Request to h2: {:?}", req);
+        debug!("Request to h2: {req:?}");
 
-        // don't send END_STREAM on HEADERS for no_header_eos
-        let send_header_eos = !peer.options.no_header_eos && body_empty;
+        // send END_STREAM on HEADERS
+        let send_header_eos = send_end_stream && body_empty;
+        debug!("send END_STREAM on HEADERS: {send_end_stream}");
 
         let req = Box::new(RequestHeader::from(req));
-        match client_session.write_request_header(req, send_header_eos) {
-            Ok(v) => v,
-            Err(e) => {
-                return (false, Some(e.into_up()));
-            }
-        };
+        if let Err(e) = client_session.write_request_header(req, send_header_eos) {
+            return (false, Some(e.into_up()));
+        }
 
-        // send END_STREAM on empty DATA frame for no_headers_eos
-        if peer.options.no_header_eos && body_empty {
+        if !send_end_stream && body_empty {
+            // send END_STREAM on empty DATA frame
             match client_session.write_request_body(Bytes::new(), true) {
                 Ok(()) => debug!("sent empty DATA frame to h2"),
                 Err(e) => {
                     return (false, Some(e.into_up()));
                 }
-            };
+            }
         }
 
         client_session.read_timeout = peer.options.read_timeout;
@@ -175,7 +176,7 @@ impl<SV> HttpProxy<SV> {
         );
 
         match ret {
-            Ok((_first, _second)) => (true, None),
+            Ok((downstream_can_reuse, _upstream)) => (downstream_can_reuse, None),
             Err(e) => (false, Some(e)),
         }
     }
@@ -192,16 +193,14 @@ impl<SV> HttpProxy<SV> {
         SV: ProxyHttp + Send + Sync,
         SV::CTX: Send + Sync,
     {
+        #[cfg(windows)]
+        let raw = client_session.fd() as std::os::windows::io::RawSocket;
+        #[cfg(unix)]
+        let raw = client_session.fd();
+
         if let Err(e) = self
             .inner
-            .connected_to_upstream(
-                session,
-                reused,
-                peer,
-                client_session.fd(),
-                client_session.digest(),
-                ctx,
-            )
+            .connected_to_upstream(session, reused, peer, raw, client_session.digest(), ctx)
             .await
         {
             return (false, Some(e));
@@ -213,13 +212,14 @@ impl<SV> HttpProxy<SV> {
         (server_session_reuse, error)
     }
 
+    // returns whether server (downstream) session can be reused
     async fn bidirection_1to2(
         &self,
         session: &mut Session,
         client_body: &mut h2::SendStream<bytes::Bytes>,
         mut rx: mpsc::Receiver<HttpTask>,
         ctx: &mut SV::CTX,
-    ) -> Result<()>
+    ) -> Result<bool>
     where
         SV: ProxyHttp + Send + Sync,
         SV::CTX: Send + Sync,
@@ -370,16 +370,19 @@ impl<SV> HttpProxy<SV> {
             }
         }
 
-        match session.as_mut().finish_body().await {
-            Ok(_) => {
-                debug!("finished sending body to downstream");
-            }
-            Err(e) => {
-                error!("Error finish sending body to downstream: {}", e);
-                // TODO: don't do downstream keepalive
+        let mut reuse_downstream = !downstream_state.is_errored();
+        if reuse_downstream {
+            match session.as_mut().finish_body().await {
+                Ok(_) => {
+                    debug!("finished sending body to downstream");
+                }
+                Err(e) => {
+                    error!("Error finish sending body to downstream: {}", e);
+                    reuse_downstream = false;
+                }
             }
         }
-        Ok(())
+        Ok(reuse_downstream)
     }
 
     async fn h2_response_filter(

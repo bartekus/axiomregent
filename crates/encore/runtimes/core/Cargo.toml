@@ -15,7 +15,7 @@ base64 = "0.21.5"
 gjson = "0.8.1"
 prost = "0.12.3"
 prost-types = "0.12.3"
-serde = "1.0"
+serde = "1.0.193"
 serde_json = { version = "1.0.108", features = ["raw_value"] }
 tokio = { version = "1.35.1", features = ["sync"] }
 tokio-stream = "0.1.17"

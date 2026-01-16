@@ -153,6 +153,7 @@ impl<SV> HttpProxy<SV> {
                                 {
                                     // Put the write lock in the request
                                     session.cache.set_write_lock(write_lock);
+                                    session.cache.tag_as_subrequest();
                                     // and then let it go to upstream
                                     break None;
                                 }
@@ -165,7 +166,9 @@ impl<SV> HttpProxy<SV> {
                                     } else {
                                         break None;
                                     }
-                                } // else continue to serve stale
+                                }
+                                // else continue to serve stale
+                                session.cache.set_stale_updating();
                             } else if session.cache.is_cache_lock_writer() {
                                 // stale while revalidate logic for the writer
                                 let will_serve_stale = session.cache.can_serve_stale_updating()
@@ -182,6 +185,7 @@ impl<SV> HttpProxy<SV> {
                                         new_app.process_subrequest(subrequest, sub_req_ctx).await;
                                     });
                                     // continue to serve stale for this request
+                                    session.cache.set_stale_updating();
                                 } else {
                                     // return to fetch from upstream
                                     break None;
@@ -306,7 +310,23 @@ impl<SV> HttpProxy<SV> {
             }
             loop {
                 match session.cache.hit_handler().read_body().await {
-                    Ok(body) => {
+                    Ok(mut body) => {
+                        let end = body.is_none();
+                        match self
+                            .inner
+                            .response_body_filter(session, &mut body, end, ctx)
+                        {
+                            Ok(Some(duration)) => {
+                                trace!("delaying response for {duration:?}");
+                                time::sleep(duration).await;
+                            }
+                            Ok(None) => { /* continue */ }
+                            Err(e) => {
+                                // body is being sent, don't treat downstream as reusable
+                                return (false, Some(e));
+                            }
+                        }
+
                         if let Some(b) = body {
                             // write to downstream
                             if let Err(e) = session
@@ -422,7 +442,7 @@ impl<SV> HttpProxy<SV> {
                             // the request to fail when the chunked response exceeds the maximum
                             // file size again.
                             if session.cache.max_file_size_bytes().is_some()
-                                && !header.headers.contains_key(header::CONTENT_LENGTH)
+                                && !meta.headers().contains_key(header::CONTENT_LENGTH)
                             {
                                 session.cache.disable(NoCacheReason::ResponseTooLarge);
                                 return Ok(());
@@ -430,7 +450,7 @@ impl<SV> HttpProxy<SV> {
 
                             session.cache.response_became_cacheable();
 
-                            if header.status == StatusCode::OK {
+                            if meta.response_header().status == StatusCode::OK {
                                 self.inner.cache_miss(session, ctx);
                             } else {
                                 // we've allowed caching on the next request,
@@ -447,7 +467,7 @@ impl<SV> HttpProxy<SV> {
                         // on the cache, validate that the response does not exceed the maximum asset size.
                         if session.cache.enabled() {
                             if let Some(max_file_size) = session.cache.max_file_size_bytes() {
-                                let content_length_hdr = header.headers.get(header::CONTENT_LENGTH);
+                                let content_length_hdr = meta.headers().get(header::CONTENT_LENGTH);
                                 if let Some(content_length) =
                                     header_value_content_length(content_length_hdr)
                                 {

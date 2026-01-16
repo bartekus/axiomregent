@@ -319,7 +319,7 @@ impl HttpSession {
             .map_or(b"", |h| h.as_bytes())
     }
 
-    /// Return a string `$METHOD $PATH $HOST`. Mostly for logging and debug purpose
+    /// Return a string `$METHOD $PATH, Host: $HOST`. Mostly for logging and debug purpose
     pub fn request_summary(&self) -> String {
         format!(
             "{} {}, Host: {}",
@@ -1009,6 +1009,13 @@ impl HttpSession {
     /// Get the reference of the [Stream] that this HTTP session is operating upon.
     pub fn stream(&self) -> &Stream {
         &self.underlying_stream
+    }
+
+    /// Consume `self`, the underlying stream will be returned and can be used
+    /// directly, for example, in the case of HTTP upgrade. The stream is not
+    /// flushed prior to being returned.
+    pub fn into_inner(self) -> Stream {
+        self.underlying_stream
     }
 }
 

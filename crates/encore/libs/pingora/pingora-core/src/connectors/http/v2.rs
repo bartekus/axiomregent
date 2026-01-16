@@ -16,7 +16,7 @@ use super::HttpSession;
 use crate::connectors::{ConnectorOptions, TransportConnector};
 use crate::protocols::http::v1::client::HttpSession as Http1Session;
 use crate::protocols::http::v2::client::{drive_connection, Http2Session};
-use crate::protocols::{Digest, Stream};
+use crate::protocols::{Digest, Stream, UniqueIDType};
 use crate::upstreams::peer::{Peer, ALPN};
 
 use bytes::Bytes;
@@ -47,7 +47,7 @@ pub(crate) struct ConnectionRefInner {
     connection_stub: Stub,
     closed: watch::Receiver<bool>,
     ping_timeout_occurred: Arc<AtomicBool>,
-    id: i32,
+    id: UniqueIDType,
     // max concurrent streams this connection is allowed to create
     max_streams: usize,
     // how many concurrent streams already active
@@ -69,7 +69,7 @@ impl ConnectionRef {
         send_req: SendRequest<Bytes>,
         closed: watch::Receiver<bool>,
         ping_timeout_occurred: Arc<AtomicBool>,
-        id: i32,
+        id: UniqueIDType,
         max_streams: usize,
         digest: Digest,
     ) -> Self {
@@ -85,9 +85,12 @@ impl ConnectionRef {
             release_lock: Arc::new(Mutex::new(())),
         }))
     }
+
     pub fn more_streams_allowed(&self) -> bool {
+        let current = self.0.current_streams.load(Ordering::Relaxed);
         !self.is_shutting_down()
-            && self.0.max_streams > self.0.current_streams.load(Ordering::Relaxed)
+            && self.0.max_streams > current
+            && self.0.connection_stub.0.current_max_send_streams() > current
     }
 
     pub fn is_idle(&self) -> bool {
@@ -98,7 +101,7 @@ impl ConnectionRef {
         self.0.current_streams.fetch_sub(1, Ordering::SeqCst);
     }
 
-    pub fn id(&self) -> i32 {
+    pub fn id(&self) -> UniqueIDType {
         self.0.id
     }
 
@@ -196,7 +199,7 @@ impl InUsePool {
 
     // release a h2_stream, this functional will cause an ConnectionRef to be returned (if exist)
     // the caller should update the ref and then decide where to put it (in use pool or idle)
-    fn release(&self, reuse_hash: u64, id: i32) -> Option<ConnectionRef> {
+    fn release(&self, reuse_hash: u64, id: UniqueIDType) -> Option<ConnectionRef> {
         let pools = self.pools.read();
         if let Some(pool) = pools.get(&reuse_hash) {
             pool.remove(id)
@@ -460,6 +463,7 @@ mod tests {
     use crate::upstreams::peer::HttpPeer;
 
     #[tokio::test]
+    #[cfg(feature = "any_tls")]
     async fn test_connect_h2() {
         let connector = Connector::new(None);
         let mut peer = HttpPeer::new(("1.1.1.1", 443), true, "one.one.one.one".into());
@@ -472,6 +476,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "any_tls")]
     async fn test_connect_h1() {
         let connector = Connector::new(None);
         let mut peer = HttpPeer::new(("1.1.1.1", 443), true, "one.one.one.one".into());
@@ -497,6 +502,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "any_tls")]
     async fn test_h2_single_stream() {
         let connector = Connector::new(None);
         let mut peer = HttpPeer::new(("1.1.1.1", 443), true, "one.one.one.one".into());
@@ -528,6 +534,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "any_tls")]
     async fn test_h2_multiple_stream() {
         let connector = Connector::new(None);
         let mut peer = HttpPeer::new(("1.1.1.1", 443), true, "one.one.one.one".into());
