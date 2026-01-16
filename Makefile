@@ -4,9 +4,16 @@
 
 SHELL := /bin/bash
 
-.PHONY: rust-build rust-test rust-lint rust-fmt-check check build test lint fmt-check
+.PHONY: rust-build rust-test rust-lint rust-fmt-check check build test lint fmt-check release fast-check
 
-check: fmt-check lint test build;
+check: fmt-check lint test;
+
+# `make release` builds an optimized binary; kept separate because it forces a full
+# rebuild in the release profile.
+release: build
+
+# `make fast-check` skips formatting and release build; useful for quick iterations.
+fast-check: lint test
 
 build: rust-build
 
