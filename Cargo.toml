@@ -8,6 +8,7 @@ edition = "2024"
 
 [dependencies]
 serde = { version = "=1.0.195", features = ["derive"] }
+pingora = { version = "0.3", features = [ "lb" ] }
 serde_json = "1"
 anyhow = "1.0"
 thiserror = "1.0"
@@ -66,7 +67,6 @@ path = "crates/antigravity"
 path = "crates/run"
 
 [patch.crates-io]
-pingora = { path = "crates/encore/libs/pingora" }
 swc_ecma_parser = { path = "crates/encore/libs/swc/crates/swc_ecma_parser" }
 swc_ecma_ast = { path = "crates/encore/libs/swc/crates/swc_ecma_ast" }
 swc_ecma_transforms_base = { path = "crates/encore/libs/swc/crates/swc_ecma_transforms_base" }
