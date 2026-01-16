@@ -1,26 +1,61 @@
-# Change 015: Verify Encore and Run Tools
+# Failed Encore Test Fixes
 
-This change ensures that `encore.ts` and `run` tools are robust, verified, and behave as specified.
+I have resolved the regression failures in `verify_encore_run` and `encore_integration` tests.
 
 ## Changes
-- **Parsed Stability**: Validated `encore.ts.parse` against golden file.
-- **Error Handling**: `encore.ts.meta` now correctly fails on errors.
-- **Environment**: `encore.ts.env.check` detects missing Node.js and Encore properly.
-- **Idempotency**: `encore.ts.run.start` returns consistent Run IDs for same arguments.
-- **Persistence**: `state.json` and `logs.ndjson` are deterministically created.
-- **Log Replay**: `logs.stream` works for stopped processes by reading from disk.
+
+### 1. Fix `verify_encore_run` Flakiness
+The `verify_encore_run` tests were flaky because they modified the global `PATH` environment variable insecurely. If a test panicked (which `test_env_check_missing_node` did), the environment was left in a corrupted state (empty PATH), causing subsequent tests to fail with `PoisonError` or logic errors.
+
+I introduced an `EnvGuard` struct that uses RAII (Resource Acquisition Is Initialization) to safely manage environment variables. It restores the original value (or unsets if it didn't exist) when the guard is dropped, ensuring cleanup even on panic.
+
+```rust
+struct EnvGuard {
+    key: String,
+    original_value: Option<String>,
+}
+
+impl Drop for EnvGuard {
+    fn drop(&mut self) {
+        unsafe {
+            if let Some(v) = &self.original_value {
+                std::env::set_var(&self.key, v);
+            } else {
+                std::env::remove_var(&self.key);
+            }
+        }
+    }
+}
+```
+
+### 2. Fix `encore_integration` Parser Errors
+The integration tests failed in CI with "unable to resolve module" because `node_modules` was missing. The `tests/fixtures/encore_app` directory git-ignores `node_modules`, so they weren't present in the fresh checkout.
+
+I updated `tests/encore_integration.rs` to automatically run `npm install` in the fixture directory if `node_modules` is missing. This ensures the test environment is correctly set up regardless of the CI state.
+
+```rust
+    // Ensure node_modules exists (needed for CI)
+    if !root.join("node_modules").exists() {
+        println!("Installing node_modules in {:?}", root);
+        let status = std::process::Command::new("npm")
+            .arg("install")
+            .current_dir(&root)
+            .status()
+            .context("Failed to run npm install")?;
+        // ...
+    }
+```
+
+### 3. Improved Debugging
+I enhanced `module_loader.rs` in `encore-tsparser` to include the source file path (`from_file`) in module resolution error messages. This makes future debugging of import errors much easier.
 
 ## Verification
-A new test suite `tests/verify_encore_run.rs` was added.
-Tests cover:
-- `test_parse_golden_stable`
-- `test_meta_error_handling`
-- `test_env_check_present` / `_missing_node`
-- `test_run_idempotency_determinism_and_logs`
-- `test_error_codes`
 
-## Usage
-To verify:
+Ran the test suites locally:
+
 ```bash
 cargo test --test verify_encore_run
+cargo test --test encore_integration
 ```
+
+Both suites now pass consistently.

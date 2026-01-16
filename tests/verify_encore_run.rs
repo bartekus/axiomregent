@@ -95,26 +95,50 @@ fn test_env_check_present() -> Result<()> {
     Ok(())
 }
 
+struct EnvGuard {
+    key: String,
+    original_value: Option<String>,
+}
+
+impl EnvGuard {
+    fn new(key: &str, value: &str) -> Self {
+        let original_value = std::env::var(key).ok();
+        unsafe {
+            std::env::set_var(key, value);
+        }
+        Self {
+            key: key.to_string(),
+            original_value,
+        }
+    }
+}
+
+impl Drop for EnvGuard {
+    fn drop(&mut self) {
+        unsafe {
+            if let Some(v) = &self.original_value {
+                std::env::set_var(&self.key, v);
+            } else {
+                std::env::remove_var(&self.key);
+            }
+        }
+    }
+}
+
 #[test]
 fn test_env_check_missing_node() -> Result<()> {
     let _lock = get_env_lock();
     setup_path();
 
-    let original_path = std::env::var("PATH").unwrap_or_default();
-    unsafe {
-        std::env::set_var("PATH", "");
-    }
+    // Use EnvGuard to safely modify PATH
+    let _guard = EnvGuard::new("PATH", "");
 
-    let result = axiomregent::tools::encore_ts::env::check();
+    let result = axiomregent::tools::encore_ts::env::check()?;
 
-    unsafe {
-        std::env::set_var("PATH", original_path);
-    }
-
-    let env = result?;
     assert!(
-        !env.deployed,
-        "Env check should return deployed=false when PATH is empty"
+        !result.deployed,
+        "Env check should return deployed=false when PATH is empty. Found version: {}",
+        result.version
     );
 
     Ok(())

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axiomregent::tools::encore_ts::{parse, run, state};
 use std::path::PathBuf;
 
@@ -6,6 +6,19 @@ use std::path::PathBuf;
 fn test_parse_encore_app() -> Result<()> {
     let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     root.push("tests/fixtures/encore_app");
+
+    // Ensure node_modules exists (needed for CI)
+    if !root.join("node_modules").exists() {
+        println!("Installing node_modules in {:?}", root);
+        let status = std::process::Command::new("npm")
+            .arg("install")
+            .current_dir(&root)
+            .status()
+            .context("Failed to run npm install")?;
+        if !status.success() {
+            anyhow::bail!("npm install failed");
+        }
+    }
 
     let snapshot = parse::parse(&root).expect("Failed to parse encore app");
 
