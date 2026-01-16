@@ -136,7 +136,7 @@ pub trait HandleHit {
 }
 
 /// Hit Handler
-pub type HitHandler = Box<(dyn HandleHit + Sync + Send)>;
+pub type HitHandler = Box<dyn HandleHit + Sync + Send>;
 
 /// Cache miss handling trait
 #[async_trait]
@@ -170,7 +170,7 @@ pub trait HandleMiss {
 }
 
 /// Miss Handler
-pub type MissHandler = Box<(dyn HandleMiss + Sync + Send)>;
+pub type MissHandler = Box<dyn HandleMiss + Sync + Send>;
 
 pub mod streaming_write {
     /// Portable u64 (sized) write id convenience type for use with streaming writes.

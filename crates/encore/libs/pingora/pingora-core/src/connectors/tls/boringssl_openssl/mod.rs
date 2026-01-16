@@ -83,7 +83,11 @@ static INIT_CA_ENV: Once = Once::new();
 fn init_ssl_cert_env_vars() {
     // this sets env vars to pick up the root certs
     // it is universal across openssl and boringssl
-    INIT_CA_ENV.call_once(openssl_probe::init_ssl_cert_env_vars);
+    INIT_CA_ENV.call_once(|| unsafe {
+        // Safety: this function sets process environment variables for SSL cert discovery.
+        // It is designed to be called once per-process; `Once` enforces that.
+        openssl_probe::init_openssl_env_vars();
+    });
 }
 
 #[derive(Clone)]

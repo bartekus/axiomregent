@@ -398,7 +398,7 @@ impl HttpSession {
                     .request_header
                     .headers
                     .get(header::CONTENT_LENGTH)
-                    .map_or(false, |cl| cl.as_bytes() == b"0"))
+                    .is_some_and(|cl| cl.as_bytes() == b"0"))
     }
 
     pub fn retry_buffer_truncated(&self) -> bool {
@@ -427,7 +427,7 @@ impl HttpSession {
     /// This async fn will be pending forever until the client closes the stream/connection
     /// This function is used for watching client status so that the server is able to cancel
     /// its internal tasks as the client waiting for the tasks goes away
-    pub fn idle(&mut self) -> Idle {
+    pub fn idle(&mut self) -> Idle<'_> {
         Idle(self)
     }
 
