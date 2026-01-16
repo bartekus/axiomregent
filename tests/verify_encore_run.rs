@@ -1,6 +1,6 @@
 use anyhow::Result;
+use axiomregent::tools::encore_ts::parse;
 use axiomregent::tools::encore_ts::tools::EncoreTools;
-use axiomregent::tools::encore_ts::{parse};
 // use axiomregent::tools::encore_ts::{run, state};
 use std::fs;
 use std::path::PathBuf;
