@@ -25,7 +25,7 @@ impl Emitter for CapturingEmitter {
     fn emit(&mut self, db: &DiagnosticBuilder<'_>) {
         // In a real implementation we might want to collect these.
         // For now, let's just log them as warnings.
-        eprintln!("Encore Parser Error: {}", db.message());
+        log::error!("Encore Parser Error: {}", db.message());
         log::warn!("Encore Parser: {}", db.message());
     }
 }
