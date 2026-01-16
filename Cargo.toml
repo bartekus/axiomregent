@@ -33,6 +33,7 @@ swc_common = { path = "crates/encore/libs/swc/crates/swc_common", features = [
     "tty-emitter",
 ] }
 encore-tsparser = { path = "crates/encore/tsparser" }
+#encore-supervisor = { path = "crates/encore/supervisor" }
 
 [features]
 default = ["transport-stdio", "resolver-local", "skills-core"]
@@ -49,6 +50,7 @@ members = [
     "crates/run",
     "crates/xray",
     "crates/encore/tsparser",
+#    "crates/encore/supervisor",
 ]
 
 [dependencies.featuregraph]

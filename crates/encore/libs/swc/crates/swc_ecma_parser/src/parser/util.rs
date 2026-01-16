@@ -95,7 +95,7 @@ impl Context {
 
 impl<I: Tokens> Parser<I> {
     /// Original context is restored when returned guard is dropped.
-    pub(super) fn with_ctx(&mut self, ctx: Context) -> WithCtx<I> {
+    pub(super) fn with_ctx(&mut self, ctx: Context) -> WithCtx<'_, I> {
         let orig_ctx = self.ctx();
         self.set_ctx(ctx);
         WithCtx {
@@ -105,7 +105,7 @@ impl<I: Tokens> Parser<I> {
     }
 
     /// Original state is restored when returned guard is dropped.
-    pub(super) fn with_state(&mut self, state: State) -> WithState<I> {
+    pub(super) fn with_state(&mut self, state: State) -> WithState<'_, I> {
         let orig_state = std::mem::replace(&mut self.state, state);
         WithState {
             orig_state,
@@ -117,7 +117,7 @@ impl<I: Tokens> Parser<I> {
         self.input.set_ctx(ctx);
     }
 
-    pub(super) fn strict_mode(&mut self) -> WithCtx<I> {
+    pub(super) fn strict_mode(&mut self) -> WithCtx<'_, I> {
         let ctx = Context {
             strict: true,
             ..self.ctx()
@@ -126,7 +126,7 @@ impl<I: Tokens> Parser<I> {
     }
 
     /// Original context is restored when returned guard is dropped.
-    pub(super) fn in_type(&mut self) -> WithCtx<I> {
+    pub(super) fn in_type(&mut self) -> WithCtx<'_, I> {
         let ctx = Context {
             in_type: true,
             ..self.ctx()
@@ -135,7 +135,7 @@ impl<I: Tokens> Parser<I> {
     }
 
     /// Original context is restored when returned guard is dropped.
-    pub(super) fn include_in_expr(&mut self, include_in_expr: bool) -> WithCtx<I> {
+    pub(super) fn include_in_expr(&mut self, include_in_expr: bool) -> WithCtx<'_, I> {
         let ctx = Context {
             include_in_expr,
             ..self.ctx()

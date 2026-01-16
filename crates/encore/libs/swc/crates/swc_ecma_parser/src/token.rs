@@ -934,7 +934,7 @@ impl TokenKind {
 }
 
 impl Word {
-    pub(crate) fn cow(&self) -> Cow<JsWord> {
+    pub(crate) fn cow(&self) -> Cow<'_, JsWord> {
         match self {
             Word::Keyword(k) => Cow::Owned(k.into_js_word()),
             Word::Ident(IdentLike::Known(w)) => Cow::Owned((*w).into()),
