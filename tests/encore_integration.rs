@@ -22,22 +22,31 @@ fn test_parse_encore_app() -> Result<()> {
     // Debug print
     println!("Snapshot: {:?}", snapshot);
 
-    // Verify service "greeting" exists
-    let greeting_service = snapshot.services.iter().find(|s| s.name == "greeting");
-    assert!(greeting_service.is_some(), "Service 'greeting' not found");
-    let service = greeting_service.unwrap();
+    // Verify service "exampleService" exists
+    let example_service = snapshot
+        .services
+        .iter()
+        .find(|s| s.name == "exampleService");
+    assert!(
+        example_service.is_some(),
+        "Service 'exampleService' not found"
+    );
+    let service = example_service.unwrap();
 
-    // Verify API "get" exists
-    let api = service.apis.iter().find(|a| a.name == "get"); // Name might be "get" or inferred.
-    // In TS: export const get = greeting.get(...) -> name is "get" usually or empty if not named explicitly?
-    // encore-tsparser uses variable name for endpoint name if not overridden?
-    // Let's print to see what it parsed.
+    // Verify API "dynamicPathParamExample" exists
+    let api = service
+        .apis
+        .iter()
+        .find(|a| a.name == "dynamicPathParamExample");
 
-    assert!(api.is_some(), "API 'get' not found in service 'greeting'");
+    assert!(
+        api.is_some(),
+        "API 'dynamicPathParamExample' not found in service 'exampleService'"
+    );
     let api = api.unwrap();
 
-    assert_eq!(api.method, "GET"); // Assuming default is GET for .get()
-    assert_eq!(api.path, "/greeting/:name");
+    assert_eq!(api.method, "GET");
+    assert_eq!(api.path, "/hello/:name");
     assert_eq!(api.access, "public");
 
     // Note: this test will only pass if I add encore.app.
