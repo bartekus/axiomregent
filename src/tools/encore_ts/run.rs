@@ -66,7 +66,7 @@ pub fn start(
     let log_file = fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .write(true)
+        // .write(true) <- unnecessary use of `.write(true)` because there is `.append(true)`
         .open(&logs_path)
         .context("Failed to open logs file")?;
 
