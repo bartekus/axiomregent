@@ -63,9 +63,6 @@ path = "crates/antigravity"
 [dependencies.run]
 path = "crates/run"
 
-[crates.encore.tsparser]
-path = "crates/encore/tsparser"
-
 [patch.crates-io]
 swc_ecma_parser = { path = "crates/encore/libs/swc/crates/swc_ecma_parser" }
 swc_ecma_ast = { path = "crates/encore/libs/swc/crates/swc_ecma_ast" }

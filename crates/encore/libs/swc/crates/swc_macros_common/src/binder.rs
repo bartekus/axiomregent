@@ -51,6 +51,7 @@ pub struct Binder<'a> {
     attrs: &'a [Attribute],
 }
 
+#[allow(clippy::empty_docs)]
 impl<'a> Binder<'a> {
     ///
     /// - `attrs`: Attributes of the type.
