@@ -7,16 +7,6 @@ fn test_parse_encore_app() -> Result<()> {
     let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     root.push("tests/fixtures/encore_app");
 
-    // The parser might fail if it strictly requires encore.service or tsconfig or other things.
-    // encore-tsparser expects a valid structure.
-    // If it fails, we might need to mock more of the app structure (encore.app, tsconfig.json).
-
-    // For now, let's try with minimal.
-    // Actually, `encore-tsparser` usually looks for `encore.app`.
-    // Let's create `encore.app` as well.
-
-    // Ensure we create encore.app in the fixture via write_to_file in next step
-
     let snapshot = parse::parse(&root).expect("Failed to parse encore app");
 
     // Debug print
@@ -26,30 +16,29 @@ fn test_parse_encore_app() -> Result<()> {
     let example_service = snapshot
         .services
         .iter()
-        .find(|s| s.name == "exampleService");
-    assert!(
-        example_service.is_some(),
-        "Service 'exampleService' not found"
-    );
-    let service = example_service.unwrap();
+        .find(|s| s.name == "exampleService")
+        .expect("Service 'exampleService' not found");
 
     // Verify API "dynamicPathParamExample" exists
-    let api = service
+    let api = example_service
         .apis
         .iter()
-        .find(|a| a.name == "dynamicPathParamExample");
-
-    assert!(
-        api.is_some(),
-        "API 'dynamicPathParamExample' not found in service 'exampleService'"
-    );
-    let api = api.unwrap();
+        .find(|a| a.name == "dynamicPathParamExample")
+        .expect("API 'dynamicPathParamExample' not found");
 
     assert_eq!(api.method, "GET");
     assert_eq!(api.path, "/hello/:name");
     assert_eq!(api.access, "public");
 
-    // Note: this test will only pass if I add encore.app.
+    // Verify service "anotherService" exists
+    let another_service = snapshot
+        .services
+        .iter()
+        .find(|s| s.name == "anotherService")
+        .expect("Service 'anotherService' not found");
+
+    // "anotherService" has no APIs in the simple fixture, just verify existence.
+    assert_eq!(another_service.name, "anotherService");
     Ok(())
 }
 
@@ -87,8 +76,9 @@ fn test_run_persistence() -> Result<()> {
     // Stop
     run::stop(&mut state, &run_id)?;
 
-    // Cleanup - purely optional, but good for test hygiene
-    let _ = std::fs::remove_dir_all(run_dir);
+    // Cleanup
+    // Commented out to allow inspection of artifacts as requested
+    // let _ = std::fs::remove_dir_all(run_dir);
 
     Ok(())
 }
