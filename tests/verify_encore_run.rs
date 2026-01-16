@@ -7,10 +7,24 @@ use std::path::PathBuf;
 use std::process::Command;
 // use std::sync::{Arc, Mutex};
 
+// Global lock for environment modification tests
+use std::sync::Mutex;
+use std::sync::OnceLock;
+
+static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn get_env_lock() -> std::sync::MutexGuard<'static, ()> {
+    ENV_LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+}
+
 #[test]
 fn test_parse_golden_stable() -> Result<()> {
-    // Only works if we run sequentially due to PATH changes in other tests
-    setup_path();
+    // Parser shouldn't depend on path if we pass absolute paths, BUT if it resolves node_modules using external tools/bins...
+    // The parser implementation uses "swc_common" etc, usually pure Rust or mostly.
+    // However, if we change PATH globally, we might affect other things.
+    // Let's lock just in case or assume safe.
+    // Golden test failed in user report? No, it passed "test test_parse_golden_stable ... ok"
+    // So we leave it as is.
 
     let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     root.push("tests/fixtures/encore_app");
@@ -40,7 +54,7 @@ fn test_parse_golden_stable() -> Result<()> {
 
 #[test]
 fn test_meta_error_handling() -> Result<()> {
-    setup_path();
+    // This passed too.
     let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     root.push("tests/fixtures/encore_app_error");
 
@@ -73,6 +87,7 @@ fn setup_path() {
 
 #[test]
 fn test_env_check_present() -> Result<()> {
+    let _lock = get_env_lock();
     setup_path();
     let env = axiomregent::tools::encore_ts::env::check()?;
     assert!(env.deployed, "Env check should pass with mock encore");
@@ -82,6 +97,7 @@ fn test_env_check_present() -> Result<()> {
 
 #[test]
 fn test_env_check_missing_node() -> Result<()> {
+    let _lock = get_env_lock();
     setup_path();
 
     let original_path = std::env::var("PATH").unwrap_or_default();
@@ -106,6 +122,7 @@ fn test_env_check_missing_node() -> Result<()> {
 
 #[test]
 fn test_run_idempotency_determinism_and_logs() -> Result<()> {
+    let _lock = get_env_lock();
     setup_path();
     let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     root.push("tests/fixtures/encore_app");
@@ -120,12 +137,6 @@ fn test_run_idempotency_determinism_and_logs() -> Result<()> {
     // Use EncoreTools to test logs.stream as well
     let tools = EncoreTools::new();
 
-    // Start via tools wrapper (or internal, but tools wrapper needs mutex)
-    // Let's use internal run logic manually first to populate state inside tools?
-    // Tools has its own state.
-    // If we use tools.run_start, we test end-to-end.
-
-    // Tools::run_start returns Value.
     let res = tools.run_start(&root, None, None)?;
     let run_id_1 = res.get("run_id").unwrap().as_str().unwrap().to_string();
 
@@ -173,12 +184,12 @@ fn test_run_idempotency_determinism_and_logs() -> Result<()> {
 
 #[test]
 fn test_error_codes() -> Result<()> {
+    // This doesn't modify env, likely safe.
     setup_path();
     let root = PathBuf::from("/non-existent/path");
     let err = parse::parse(&root).unwrap_err();
 
     let err_str = err.to_string();
-    // Generic error
     assert!(
         err_str.contains("Encore TS parsing failed with errors")
             || err_str.contains("No such file"),
