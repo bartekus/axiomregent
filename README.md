@@ -16,6 +16,7 @@ axiomregent is composed of 6 authoritative features. The source of truth for the
 | **XRAY_ANALYSIS** | Repository Scanning Engine | [spec/xray/analysis.md](spec/xray/analysis.md) | Stable |
 | **ANTIGRAVITY_AUTOMATION** | Antigravity Agent Protocol | [spec/antigravity/automation.md](spec/antigravity/automation.md) | Beta |
 | **AXIOMREGENT_RUN_SKILLS** | AxiomRegent Run CLI Skills | [spec/run/skills.md](spec/run/skills.md) | Stable |
+| **ENCORE_TS_INTEGRATION** | Encore TypeScript Toolchain | [spec/core/encore_ts.md](spec/core/encore_ts.md) | Beta |
 
 ## Antigravity Automation
 

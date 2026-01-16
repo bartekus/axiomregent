@@ -80,7 +80,7 @@ features:
   - id: ENCORE_TS_INTEGRATION
     title: "Encore TypeScript Toolchain"
     governance: approved
-    implementation: in_progress
+    implementation: implemented
     spec: "spec/core/encore_ts.md"
     owner: core-team
     group: integrations
