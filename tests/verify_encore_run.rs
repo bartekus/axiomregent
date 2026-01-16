@@ -1,10 +1,11 @@
 use anyhow::Result;
 use axiomregent::tools::encore_ts::tools::EncoreTools;
-use axiomregent::tools::encore_ts::{parse, run, state};
+use axiomregent::tools::encore_ts::{parse};
+// use axiomregent::tools::encore_ts::{run, state};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::{Arc, Mutex};
+// use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_parse_golden_stable() -> Result<()> {
@@ -57,6 +58,7 @@ fn test_meta_error_handling() -> Result<()> {
     Ok(())
 }
 
+#[allow(unused_mut)]
 fn setup_path() {
     let mut path = std::env::var("PATH").unwrap_or_default();
     let bin_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/bin");
@@ -148,7 +150,7 @@ fn test_run_idempotency_determinism_and_logs() -> Result<()> {
     let logs_arr = logs_res.get("logs").unwrap().as_array().unwrap();
     println!("Logs from tool: {:?}", logs_arr);
 
-    assert!(logs_arr.len() > 0, "Should have logs");
+    assert!(!logs_arr.is_empty(), "Should have logs");
     // Mock encore prints "Mock Encore Run Started", "Log line 1", "Log line 2"
 
     // Logs from file
