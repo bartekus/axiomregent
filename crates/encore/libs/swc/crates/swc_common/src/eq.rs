@@ -187,7 +187,7 @@ macro_rules! deref {
 
 deref!(Box, Rc, Arc);
 
-impl<'a, N> EqIgnoreSpan for &'a N
+impl<N> EqIgnoreSpan for &N
 where
     N: EqIgnoreSpan,
 {
@@ -197,7 +197,7 @@ where
     }
 }
 
-impl<'a, N> TypeEq for &'a N
+impl<N> TypeEq for &N
 where
     N: TypeEq,
 {

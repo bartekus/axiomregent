@@ -1,6 +1,6 @@
 extern crate proc_macro;
 
-use std::{collections::HashSet, mem::replace};
+use std::collections::HashSet;
 
 use inflector::Inflector;
 use pmutil::{q, Quote, SpanExt};
@@ -1143,33 +1143,30 @@ fn make(mode: Mode, stmts: &[Stmt]) -> Quote {
             fn_name = Ident::new(&format!("{}_with_path", fn_name), def_site());
         }
 
-        let default_body = replace(
-            &mut v.default,
-            Some(match mode {
-                Mode::Fold(VisitorVariant::Normal)
-                | Mode::VisitMut(VisitorVariant::Normal)
-                | Mode::Visit(VisitorVariant::Normal) => q!(Vars { fn_name: &fn_name }, {
-                    {
-                        fn_name(self, n)
-                    }
-                })
-                .parse(),
+        let default_body = v.default.replace(match mode {
+            Mode::Fold(VisitorVariant::Normal)
+            | Mode::VisitMut(VisitorVariant::Normal)
+            | Mode::Visit(VisitorVariant::Normal) => q!(Vars { fn_name: &fn_name }, {
+                {
+                    fn_name(self, n)
+                }
+            })
+            .parse(),
 
-                Mode::Fold(VisitorVariant::WithPath)
-                | Mode::VisitMut(VisitorVariant::WithPath)
-                | Mode::Visit(VisitorVariant::WithPath) => q!(Vars { fn_name: &fn_name }, {
-                    {
-                        fn_name(self, n, __ast_path)
-                    }
-                })
-                .parse(),
+            Mode::Fold(VisitorVariant::WithPath)
+            | Mode::VisitMut(VisitorVariant::WithPath)
+            | Mode::Visit(VisitorVariant::WithPath) => q!(Vars { fn_name: &fn_name }, {
+                {
+                    fn_name(self, n, __ast_path)
+                }
+            })
+            .parse(),
 
-                Mode::VisitAll => Block {
-                    brace_token: def_site(),
-                    stmts: Default::default(),
-                },
-            }),
-        );
+            Mode::VisitAll => Block {
+                brace_token: def_site(),
+                stmts: Default::default(),
+            },
+        });
 
         let arg_ty = v
             .sig

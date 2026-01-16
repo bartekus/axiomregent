@@ -1112,7 +1112,7 @@ impl EmitterWriter {
                     let mut to_add = HashMap::<_, _>::default();
 
                     for (depth, style) in depths {
-                        if multilines.get(&depth).is_some() {
+                        if multilines.contains_key(&depth) {
                             multilines.remove(&depth);
                         } else {
                             to_add.insert(depth, style);

@@ -43,11 +43,9 @@ pub fn start(
     let buffer_clone1 = log_buffer.clone();
     thread::spawn(move || {
         let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            if let Ok(l) = line {
-                if let Ok(mut buf) = buffer_clone1.lock() {
-                    buf.push(l);
-                }
+        for l in reader.lines().map_while(Result::ok) {
+            if let Ok(mut buf) = buffer_clone1.lock() {
+                buf.push(l);
             }
         }
     });
@@ -55,11 +53,9 @@ pub fn start(
     let buffer_clone2 = log_buffer.clone();
     thread::spawn(move || {
         let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            if let Ok(l) = line {
-                if let Ok(mut buf) = buffer_clone2.lock() {
-                    buf.push(l);
-                }
+        for l in reader.lines().map_while(Result::ok) {
+            if let Ok(mut buf) = buffer_clone2.lock() {
+                buf.push(l);
             }
         }
     });

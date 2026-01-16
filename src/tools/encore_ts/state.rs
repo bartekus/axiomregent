@@ -19,6 +19,12 @@ pub struct RunProcess {
     pub log_buffer: Arc<Mutex<Vec<String>>>, // Simplified log buffer
 }
 
+impl Default for EncoreState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EncoreState {
     pub fn new() -> Self {
         Self {

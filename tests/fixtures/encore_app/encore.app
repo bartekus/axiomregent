@@ -1,4 +1,4 @@
 {
-    "id": "my-app",
-    "version": "1.0.0"
+	"id":   "",
+	"lang": "typescript"
 }

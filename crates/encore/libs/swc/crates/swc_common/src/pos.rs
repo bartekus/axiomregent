@@ -145,7 +145,7 @@ where
     }
 }
 
-impl<'a, S> Spanned for &'a S
+impl<S> Spanned for &S
 where
     S: ?Sized + Spanned,
 {
