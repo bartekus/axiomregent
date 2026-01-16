@@ -15,21 +15,17 @@
 //! Connecting to servers
 
 pub mod http;
-pub mod l4;
+mod l4;
 mod offload;
-
-#[cfg(feature = "any_tls")]
 mod tls;
-
-#[cfg(not(feature = "any_tls"))]
-use crate::tls::connectors as tls;
 
 use crate::protocols::Stream;
 use crate::server::configuration::ServerConf;
+use crate::tls::ssl::SslConnector;
 use crate::upstreams::peer::{Peer, ALPN};
 
+use l4::connect as l4_connect;
 pub use l4::Connect as L4Connect;
-use l4::{connect as l4_connect, BindTo};
 use log::{debug, error, warn};
 use offload::OffloadRuntime;
 use parking_lot::RwLock;
@@ -38,7 +34,6 @@ use pingora_pool::{ConnectionMeta, ConnectionPool};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tls::TlsConnector;
 use tokio::sync::Mutex;
 
 /// The options to configure a [TransportConnector]
@@ -200,28 +195,10 @@ impl TransportConnector {
                         let mut stream = l.into_inner();
                         // test_reusable_stream: we assume server would never actively send data
                         // first on an idle stream.
-                        #[cfg(unix)]
                         if peer.matches_fd(stream.id()) && test_reusable_stream(&mut stream) {
                             Some(stream)
                         } else {
                             None
-                        }
-                        #[cfg(windows)]
-                        {
-                            use std::os::windows::io::{AsRawSocket, RawSocket};
-                            struct WrappedRawSocket(RawSocket);
-                            impl AsRawSocket for WrappedRawSocket {
-                                fn as_raw_socket(&self) -> RawSocket {
-                                    self.0
-                                }
-                            }
-                            if peer.matches_sock(WrappedRawSocket(stream.id() as RawSocket))
-                                && test_reusable_stream(&mut stream)
-                            {
-                                Some(stream)
-                            } else {
-                                None
-                            }
                         }
                     }
                     Err(_) => {
@@ -296,9 +273,9 @@ impl TransportConnector {
 // connection timeout if there is one
 async fn do_connect<P: Peer + Send + Sync>(
     peer: &P,
-    bind_to: Option<BindTo>,
+    bind_to: Option<SocketAddr>,
     alpn_override: Option<ALPN>,
-    tls_ctx: &TlsConnector,
+    tls_ctx: &SslConnector,
 ) -> Result<Stream> {
     // Create the future that does the connections, but don't evaluate it until
     // we decide if we need a timeout or not
@@ -319,9 +296,9 @@ async fn do_connect<P: Peer + Send + Sync>(
 // Perform the actual L4 and tls connection steps with no timeout
 async fn do_connect_inner<P: Peer + Send + Sync>(
     peer: &P,
-    bind_to: Option<BindTo>,
+    bind_to: Option<SocketAddr>,
     alpn_override: Option<ALPN>,
-    tls_ctx: &TlsConnector,
+    tls_ctx: &SslConnector,
 ) -> Result<Stream> {
     let stream = l4_connect(peer, bind_to).await?;
     if peer.tls() {
@@ -388,15 +365,13 @@ fn test_reusable_stream(stream: &mut Stream) -> bool {
 }
 
 #[cfg(test)]
-#[cfg(feature = "any_tls")]
 mod tests {
     use pingora_error::ErrorType;
-    use tls::Connector;
 
     use super::*;
+    use crate::tls::ssl::SslMethod;
     use crate::upstreams::peer::BasicPeer;
     use tokio::io::AsyncWriteExt;
-    #[cfg(unix)]
     use tokio::net::UnixListener;
 
     // 192.0.2.1 is effectively a black hole
@@ -428,11 +403,9 @@ mod tests {
         assert!(reused);
     }
 
-    #[cfg(unix)]
     const MOCK_UDS_PATH: &str = "/tmp/test_unix_transport_connector.sock";
 
     // one-off mock server
-    #[cfg(unix)]
     async fn mock_connect_server() {
         let _ = std::fs::remove_file(MOCK_UDS_PATH);
         let listener = UnixListener::bind(MOCK_UDS_PATH).unwrap();
@@ -503,8 +476,8 @@ mod tests {
     /// This assumes that the connection will fail to on the peer and returns
     /// the decomposed error type and message
     async fn get_do_connect_failure_with_peer(peer: &BasicPeer) -> (ErrorType, String) {
-        let tls_connector = Connector::new(None);
-        let stream = do_connect(peer, None, None, &tls_connector.ctx).await;
+        let ssl_connector = SslConnector::builder(SslMethod::tls()).unwrap().build();
+        let stream = do_connect(peer, None, None, &ssl_connector).await;
         match stream {
             Ok(_) => panic!("should throw an error"),
             Err(e) => (

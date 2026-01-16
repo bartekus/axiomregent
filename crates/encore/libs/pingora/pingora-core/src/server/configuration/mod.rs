@@ -67,24 +67,21 @@ pub struct ServerConf {
     /// Timeout in seconds of the final step for the graceful shutdown.
     pub graceful_shutdown_timeout_seconds: Option<u64>,
     // These options don't belong here as they are specific to certain services
-    /// IPv4 addresses for a client connector to bind to. See
-    /// [`ConnectorOptions`](crate::connectors::ConnectorOptions).
+    /// IPv4 addresses for a client connector to bind to. See [`ConnectorOptions`].
     /// Note: this is an _unstable_ field that may be renamed or removed in the future.
     pub client_bind_to_ipv4: Vec<String>,
-    /// IPv6 addresses for a client connector to bind to. See
-    /// [`ConnectorOptions`](crate::connectors::ConnectorOptions).
+    /// IPv6 addresses for a client connector to bind to. See [`ConnectorOptions`].
     /// Note: this is an _unstable_ field that may be renamed or removed in the future.
     pub client_bind_to_ipv6: Vec<String>,
-    /// Keepalive pool size for client connections to upstream. See
-    /// [`ConnectorOptions`](crate::connectors::ConnectorOptions).
+    /// Keepalive pool size for client connections to upstream. See [`ConnectorOptions`].
     /// Note: this is an _unstable_ field that may be renamed or removed in the future.
     pub upstream_keepalive_pool_size: usize,
     /// Number of dedicated thread pools to use for upstream connection establishment.
-    /// See [`ConnectorOptions`](crate::connectors::ConnectorOptions).
+    /// See [`ConnectorOptions`].
     /// Note: this is an _unstable_ field that may be renamed or removed in the future.
     pub upstream_connect_offload_threadpools: Option<usize>,
     /// Number of threads per dedicated upstream connection establishment pool.
-    /// See [`ConnectorOptions`](crate::connectors::ConnectorOptions).
+    /// See [`ConnectorOptions`].
     /// Note: this is an _unstable_ field that may be renamed or removed in the future.
     pub upstream_connect_offload_thread_per_pool: Option<usize>,
     /// When enabled allows TLS keys to be written to a file specified by the SSLKEYLOG
@@ -121,7 +118,7 @@ impl Default for ServerConf {
 
 /// Command-line options
 ///
-/// Call `Opt::parse_args()` to build this object from the process's command line arguments.
+/// Call `Opt::from_args()` to build this object from the process's command line arguments.
 #[derive(Parser, Debug, Default)]
 #[clap(name = "basic", long_about = None)]
 pub struct Opt {

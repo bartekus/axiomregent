@@ -15,42 +15,20 @@
 //! The listening endpoints (TCP and TLS) and their configurations.
 
 mod l4;
+mod tls;
 
-#[cfg(feature = "any_tls")]
-pub mod tls;
-
-#[cfg(not(feature = "any_tls"))]
-pub use crate::tls::listeners as tls;
-
-use crate::protocols::{tls::TlsRef, Stream};
-
-#[cfg(unix)]
+use crate::protocols::Stream;
 use crate::server::ListenFds;
 
-use async_trait::async_trait;
 use pingora_error::Result;
 use std::{fs::Permissions, sync::Arc};
 
 use l4::{ListenerEndpoint, Stream as L4Stream};
-use tls::{Acceptor, TlsSettings};
+use tls::Acceptor;
 
-pub use crate::protocols::tls::ALPN;
+pub use crate::protocols::ssl::server::TlsAccept;
 pub use l4::{ServerAddress, TcpSocketOptions};
-
-/// The APIs to customize things like certificate during TLS server side handshake
-#[async_trait]
-pub trait TlsAccept {
-    // TODO: return error?
-    /// This function is called in the middle of a TLS handshake. Structs who
-    /// implement this function should provide tls certificate and key to the
-    /// [TlsRef] via `ssl_use_certificate` and `ssl_use_private_key`.
-    /// Note. This is only supported for openssl and boringssl
-    async fn certificate_callback(&self, _ssl: &mut TlsRef) -> () {
-        // does nothing by default
-    }
-}
-
-pub type TlsAcceptCallbacks = Box<dyn TlsAccept + Send + Sync>;
+pub use tls::{TlsSettings, ALPN};
 
 struct TransportStackBuilder {
     l4: ServerAddress,
@@ -58,11 +36,10 @@ struct TransportStackBuilder {
 }
 
 impl TransportStackBuilder {
-    pub fn build(&mut self, #[cfg(unix)] upgrade_listeners: Option<ListenFds>) -> TransportStack {
+    pub fn build(&mut self, upgrade_listeners: Option<ListenFds>) -> TransportStack {
         TransportStack {
             l4: ListenerEndpoint::new(self.l4.clone()),
             tls: self.tls.take().map(|tls| Arc::new(tls.build())),
-            #[cfg(unix)]
             upgrade_listeners,
         }
     }
@@ -72,7 +49,6 @@ pub(crate) struct TransportStack {
     l4: ListenerEndpoint,
     tls: Option<Arc<Acceptor>>,
     // listeners sent from the old process for graceful upgrade
-    #[cfg(unix)]
     upgrade_listeners: Option<ListenFds>,
 }
 
@@ -82,12 +58,7 @@ impl TransportStack {
     }
 
     pub async fn listen(&mut self) -> Result<()> {
-        self.l4
-            .listen(
-                #[cfg(unix)]
-                self.upgrade_listeners.take(),
-            )
-            .await
+        self.l4.listen(self.upgrade_listeners.take()).await
     }
 
     pub async fn accept(&mut self) -> Result<UninitializedStream> {
@@ -138,7 +109,6 @@ impl Listeners {
     }
 
     /// Create a new [`Listeners`] with a Unix domain socket endpoint from the given string.
-    #[cfg(unix)]
     pub fn uds(addr: &str, perm: Option<Permissions>) -> Self {
         let mut listeners = Self::new();
         listeners.add_uds(addr, perm);
@@ -166,7 +136,6 @@ impl Listeners {
     }
 
     /// Add a Unix domain socket endpoint to `self`.
-    #[cfg(unix)]
     pub fn add_uds(&mut self, addr: &str, perm: Option<Permissions>) {
         self.add_address(ServerAddress::Uds(addr.into(), perm));
     }
@@ -199,18 +168,10 @@ impl Listeners {
         self.stacks.push(TransportStackBuilder { l4, tls })
     }
 
-    pub(crate) fn build(
-        &mut self,
-        #[cfg(unix)] upgrade_listeners: Option<ListenFds>,
-    ) -> Vec<TransportStack> {
+    pub(crate) fn build(&mut self, upgrade_listeners: Option<ListenFds>) -> Vec<TransportStack> {
         self.stacks
             .iter_mut()
-            .map(|b| {
-                b.build(
-                    #[cfg(unix)]
-                    upgrade_listeners.clone(),
-                )
-            })
+            .map(|b| b.build(upgrade_listeners.clone()))
             .collect()
     }
 
@@ -222,7 +183,6 @@ impl Listeners {
 #[cfg(test)]
 mod test {
     use super::*;
-    #[cfg(feature = "any_tls")]
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpStream;
     use tokio::time::{sleep, Duration};
@@ -234,10 +194,7 @@ mod test {
         let mut listeners = Listeners::tcp(addr1);
         listeners.add_tcp(addr2);
 
-        let listeners = listeners.build(
-            #[cfg(unix)]
-            None,
-        );
+        let listeners = listeners.build(None);
         assert_eq!(listeners.len(), 2);
         for mut listener in listeners {
             tokio::spawn(async move {
@@ -256,7 +213,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg(feature = "any_tls")]
     async fn test_listen_tls() {
         use tokio::io::AsyncReadExt;
 
@@ -264,13 +220,7 @@ mod test {
         let cert_path = format!("{}/tests/keys/server.crt", env!("CARGO_MANIFEST_DIR"));
         let key_path = format!("{}/tests/keys/key.pem", env!("CARGO_MANIFEST_DIR"));
         let mut listeners = Listeners::tls(addr, &cert_path, &key_path).unwrap();
-        let mut listener = listeners
-            .build(
-                #[cfg(unix)]
-                None,
-            )
-            .pop()
-            .unwrap();
+        let mut listener = listeners.build(None).pop().unwrap();
 
         tokio::spawn(async move {
             listener.listen().await.unwrap();

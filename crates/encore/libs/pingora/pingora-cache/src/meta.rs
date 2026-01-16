@@ -14,7 +14,7 @@
 
 //! Metadata for caching
 
-pub use http::Extensions;
+use http::Extensions;
 use pingora_error::{Error, ErrorType::*, OrErr, Result};
 use pingora_http::{HMap, ResponseHeader};
 use serde::{Deserialize, Serialize};
@@ -595,19 +595,8 @@ fn load_file(path: &String) -> Option<Vec<u8>> {
 }
 
 static HEADER_SERDE: Lazy<HeaderSerde> = Lazy::new(|| {
-    let dict_path_opt = COMPRESSION_DICT_PATH.get();
-
-    if dict_path_opt.is_none() {
-        warn!("COMPRESSION_DICT_PATH is not set");
-    }
-
-    let result = dict_path_opt.and_then(load_file);
-
-    if result.is_none() {
-        warn!("HeaderSerde not loaded from file");
-    }
-
-    HeaderSerde::new(result)
+    let dict = COMPRESSION_DICT_PATH.get().and_then(load_file);
+    HeaderSerde::new(dict)
 });
 
 pub(crate) fn header_serialize(header: &ResponseHeader) -> Result<Vec<u8>> {

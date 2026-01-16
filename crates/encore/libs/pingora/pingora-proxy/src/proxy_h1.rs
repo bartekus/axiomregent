@@ -98,7 +98,7 @@ impl<SV> HttpProxy<SV> {
         );
 
         match ret {
-            Ok((downstream_can_reuse, _upstream)) => (downstream_can_reuse, true, None),
+            Ok((_first, _second)) => (true, true, None),
             Err(e) => (false, false, Some(e)),
         }
     }
@@ -116,18 +116,13 @@ impl<SV> HttpProxy<SV> {
         SV: ProxyHttp + Send + Sync,
         SV::CTX: Send + Sync,
     {
-        #[cfg(windows)]
-        let raw = client_session.id() as std::os::windows::io::RawSocket;
-        #[cfg(unix)]
-        let raw = client_session.id();
-
         if let Err(e) = self
             .inner
             .connected_to_upstream(
                 session,
                 reused,
                 peer,
-                raw,
+                client_session.id(),
                 Some(client_session.digest()),
                 ctx,
             )
@@ -204,14 +199,13 @@ impl<SV> HttpProxy<SV> {
     }
 
     // todo use this function to replace bidirection_1to2()
-    // returns whether this server (downstream) session can be reused
     async fn proxy_handle_downstream(
         &self,
         session: &mut Session,
         tx: mpsc::Sender<HttpTask>,
         mut rx: mpsc::Receiver<HttpTask>,
         ctx: &mut SV::CTX,
-    ) -> Result<bool>
+    ) -> Result<()>
     where
         SV: ProxyHttp + Send + Sync,
         SV::CTX: Send + Sync,
@@ -417,19 +411,16 @@ impl<SV> HttpProxy<SV> {
             }
         }
 
-        let mut reuse_downstream = !downstream_state.is_errored();
-        if reuse_downstream {
-            match session.as_mut().finish_body().await {
-                Ok(_) => {
-                    debug!("finished sending body to downstream");
-                }
-                Err(e) => {
-                    error!("Error finish sending body to downstream: {}", e);
-                    reuse_downstream = false;
-                }
+        match session.as_mut().finish_body().await {
+            Ok(_) => {
+                debug!("finished sending body to downstream");
+            }
+            Err(e) => {
+                error!("Error finish sending body to downstream: {}", e);
+                // TODO: don't do downstream keepalive
             }
         }
-        Ok(reuse_downstream)
+        Ok(())
     }
 
     async fn h1_response_filter(

@@ -36,11 +36,12 @@
 //!
 //! If looking to build a (reverse) proxy, see [`pingora-proxy`](https://docs.rs/pingora-proxy) crate.
 //!
-//! # Feature flags
-#![cfg_attr(
-    feature = "document-features",
-    cfg_attr(doc, doc = ::document_features::document_features!())
-)]
+//! # features
+//! * `openssl`: Using OpenSSL as the internal TLS backend. This feature is default on.
+//! * `boringssl`: Switch the internal TLS library from OpenSSL to BoringSSL. This feature will disable `openssl`.
+//! * `proxy`: This feature will include and export `pingora_proxy::prelude::*`.
+//! * `lb`: This feature will include and export `pingora_load_balancing::prelude::*`.
+//! * `cache`: This feature will include and export `pingora_cache::prelude::*`.
 
 pub use pingora_core::*;
 

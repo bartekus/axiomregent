@@ -21,7 +21,6 @@ use key::{CacheHashKey, HashBinary};
 use lock::WritePermit;
 use pingora_error::Result;
 use pingora_http::ResponseHeader;
-use rustracing::tag::Tag;
 use std::time::{Duration, Instant, SystemTime};
 use trace::CacheTraceCTX;
 
@@ -58,7 +57,6 @@ pub struct HttpCache {
     phase: CachePhase,
     // Box the rest so that a disabled HttpCache struct is small
     inner: Option<Box<HttpCacheInner>>,
-    digest: HttpCacheDigest,
 }
 
 /// This reflects the phase of HttpCache during the lifetime of a request
@@ -79,8 +77,6 @@ pub enum CachePhase {
     Miss,
     /// A staled (expired) asset is found
     Stale,
-    /// A staled (expired) asset was found, but another request is revalidating it
-    StaleUpdating,
     /// A staled (expired) asset was found, so a fresh one was fetched
     Expired,
     /// A staled (expired) asset was found, and it was revalidated to be fresh
@@ -100,7 +96,6 @@ impl CachePhase {
             CachePhase::Hit => "hit",
             CachePhase::Miss => "miss",
             CachePhase::Stale => "stale",
-            CachePhase::StaleUpdating => "stale-updating",
             CachePhase::Expired => "expired",
             CachePhase::Revalidated => "revalidated",
             CachePhase::RevalidatedNoCache(_) => "revalidated-nocache",
@@ -151,29 +146,6 @@ impl NoCacheReason {
             CacheLockTimeout => "CacheLockTimeout",
             Custom(s) => s,
         }
-    }
-}
-
-/// Information collected about the caching operation that will not be cleared
-#[derive(Debug, Default)]
-pub struct HttpCacheDigest {
-    pub lock_duration: Option<Duration>,
-    // time spent in cache lookup and reading the header
-    pub lookup_duration: Option<Duration>,
-}
-
-/// Convenience function to add a duration to an optional duration
-fn add_duration_to_opt(target_opt: &mut Option<Duration>, to_add: Duration) {
-    *target_opt = Some(target_opt.map_or(to_add, |existing| existing + to_add));
-}
-
-impl HttpCacheDigest {
-    fn add_lookup_duration(&mut self, extra_lookup_duration: Duration) {
-        add_duration_to_opt(&mut self.lookup_duration, extra_lookup_duration)
-    }
-
-    fn add_lock_duration(&mut self, extra_lock_duration: Duration) {
-        add_duration_to_opt(&mut self.lock_duration, extra_lock_duration)
     }
 }
 
@@ -249,6 +221,9 @@ struct HttpCacheInner {
     pub predictor: Option<&'static (dyn predictor::CacheablePredictor + Sync)>,
     pub lock: Option<Locked>, // TODO: these 3 fields should come in 1 sub struct
     pub cache_lock: Option<&'static CacheLock>,
+    pub lock_duration: Option<Duration>,
+    // time spent in cache lookup and reading the header
+    pub lookup_duration: Option<Duration>,
     pub traces: trace::CacheTraceCTX,
 }
 
@@ -260,7 +235,6 @@ impl HttpCache {
         HttpCache {
             phase: CachePhase::Disabled(NoCacheReason::NeverEnabled),
             inner: None,
-            digest: HttpCacheDigest::default(),
         }
     }
 
@@ -286,7 +260,7 @@ impl HttpCache {
         use CachePhase::*;
         match self.phase {
             Disabled(_) | Bypass | Miss | Expired | Revalidated | RevalidatedNoCache(_) => true,
-            Hit | Stale | StaleUpdating => false,
+            Hit | Stale => false,
             Uninit | CacheKey => false, // invalid states for this call, treat them as false to keep it simple
         }
     }
@@ -396,6 +370,8 @@ impl HttpCache {
                     predictor,
                     lock: None,
                     cache_lock,
+                    lock_duration: None,
+                    lookup_duration: None,
                     traces: CacheTraceCTX::new(),
                 }));
             }
@@ -517,14 +493,8 @@ impl HttpCache {
         match self.phase {
             // from CacheKey: set state to miss during cache lookup
             // from Bypass: response became cacheable, set state to miss to cache
-            // from Stale: waited for cache lock, then retried and found asset was gone
-            CachePhase::CacheKey | CachePhase::Bypass | CachePhase::Stale => {
+            CachePhase::CacheKey | CachePhase::Bypass => {
                 self.phase = CachePhase::Miss;
-                // It's possible that we've set the meta on lookup and have come back around
-                // here after not being able to acquire the cache lock, and our item has since
-                // purged or expired. We should be sure that the meta is not set in this case
-                // as there shouldn't be a meta set for cache misses.
-                self.inner_mut().meta = None;
                 self.inner_mut().traces.start_miss_span();
             }
             _ => panic!("wrong phase {:?}", self.phase),
@@ -538,7 +508,6 @@ impl HttpCache {
         match self.phase {
             CachePhase::Hit
             | CachePhase::Stale
-            | CachePhase::StaleUpdating
             | CachePhase::Revalidated
             | CachePhase::RevalidatedNoCache(_) => self.inner_mut().body_reader.as_mut().unwrap(),
             _ => panic!("wrong phase {:?}", self.phase),
@@ -574,7 +543,6 @@ impl HttpCache {
             | CachePhase::Miss
             | CachePhase::Expired
             | CachePhase::Stale
-            | CachePhase::StaleUpdating
             | CachePhase::Revalidated
             | CachePhase::RevalidatedNoCache(_) => {
                 let inner = self.inner_mut();
@@ -632,15 +600,7 @@ impl HttpCache {
                     // Downstream read and upstream write can be decoupled
                     let body_reader = inner
                         .storage
-                        .lookup_streaming_write(
-                            key,
-                            inner
-                                .miss_handler
-                                .as_ref()
-                                .expect("miss handler already set")
-                                .streaming_write_tag(),
-                            &inner.traces.get_miss_span(),
-                        )
+                        .lookup(key, &inner.traces.get_miss_span())
                         .await?;
 
                     if let Some((_meta, body_reader)) = body_reader {
@@ -739,15 +699,10 @@ impl HttpCache {
                 // that requires cacheable_filter to take a mut header and just return InternalMeta
 
                 // update new meta with old meta's created time
-                let old_meta = inner.meta.take().unwrap();
-                let created = old_meta.0.internal.created;
+                let created = inner.meta.as_ref().unwrap().0.internal.created;
                 meta.0.internal.created = created;
                 // meta.internal.updated was already set to new meta's `created`,
                 // no need to set `updated` here
-                // Merge old extensions with new ones. New exts take precedence if they conflict.
-                let mut extensions = old_meta.0.extensions;
-                extensions.extend(meta.0.extensions);
-                meta.0.extensions = extensions;
 
                 inner.meta.replace(meta);
 
@@ -830,14 +785,6 @@ impl HttpCache {
         // TODO: remove this asset from cache once finished?
     }
 
-    /// Mark this asset as stale, but being updated separately from this request.
-    pub fn set_stale_updating(&mut self) {
-        match self.phase {
-            CachePhase::Stale => self.phase = CachePhase::StaleUpdating,
-            _ => panic!("wrong phase {:?}", self.phase),
-        }
-    }
-
     /// Update the variance of the [CacheMeta].
     ///
     /// Note that this process may change the lookup `key`, and eventually (when the asset is
@@ -906,7 +853,6 @@ impl HttpCache {
         match self.phase {
             // TODO: allow in Bypass phase?
             CachePhase::Stale
-            | CachePhase::StaleUpdating
             | CachePhase::Expired
             | CachePhase::Hit
             | CachePhase::Revalidated
@@ -935,7 +881,6 @@ impl HttpCache {
         match self.phase {
             CachePhase::Miss
             | CachePhase::Stale
-            | CachePhase::StaleUpdating
             | CachePhase::Expired
             | CachePhase::Hit
             | CachePhase::Revalidated
@@ -954,16 +899,18 @@ impl HttpCache {
         match self.phase {
             // Stale is allowed here because stale-> cache_lock -> lookup again
             CachePhase::CacheKey | CachePhase::Stale => {
-                let inner = self
-                    .inner
-                    .as_mut()
-                    .expect("Cache phase is checked and should have inner");
+                let inner = self.inner_mut();
                 let mut span = inner.traces.child("lookup");
                 let key = inner.key.as_ref().unwrap(); // safe, this phase should have cache key
                 let now = Instant::now();
                 let result = inner.storage.lookup(key, &span.handle()).await?;
+                let lookup_duration = now.elapsed();
                 // one request may have multiple lookups
-                self.digest.add_lookup_duration(now.elapsed());
+                inner.lookup_duration = Some(
+                    inner
+                        .lookup_duration
+                        .map_or(lookup_duration, |d| d + lookup_duration),
+                );
                 let result = result.and_then(|(meta, header)| {
                     if let Some(ts) = inner.valid_after {
                         if meta.created() < ts {
@@ -994,8 +941,7 @@ impl HttpCache {
     /// - return false if the current meta doesn't match the variance, need to cache_lookup() again
     pub fn cache_vary_lookup(&mut self, variance: HashBinary, meta: &CacheMeta) -> bool {
         match self.phase {
-            // Stale is allowed here because stale-> cache_lock -> lookup again
-            CachePhase::CacheKey | CachePhase::Stale => {
+            CachePhase::CacheKey => {
                 let inner = self.inner_mut();
                 // make sure that all variances found are fresher than this asset
                 // this is because when purging all the variance, only the primary slot is deleted
@@ -1059,7 +1005,7 @@ impl HttpCache {
 
     /// Whether this request's cache hit is staled
     fn has_staled_asset(&self) -> bool {
-        matches!(self.phase, CachePhase::Stale | CachePhase::StaleUpdating)
+        self.phase == CachePhase::Stale
     }
 
     /// Whether this asset is staled and stale if error is allowed
@@ -1080,17 +1026,19 @@ impl HttpCache {
     /// Check [Self::is_cache_locked()], panic if this request doesn't have a read lock.
     pub async fn cache_lock_wait(&mut self) -> LockStatus {
         let inner = self.inner_mut();
-        let mut span = inner.traces.child("cache_lock");
+        let _span = inner.traces.child("cache_lock");
         let lock = inner.lock.take(); // remove the lock from self
         if let Some(Locked::Read(r)) = lock {
             let now = Instant::now();
             r.wait().await;
+            let lock_duration = now.elapsed();
             // it's possible for a request to be locked more than once
-            self.digest.add_lock_duration(now.elapsed());
-            let status = r.lock_status();
-            let tag_value: &'static str = status.into();
-            span.set_tag(|| Tag::new("status", tag_value));
-            status
+            inner.lock_duration = Some(
+                inner
+                    .lock_duration
+                    .map_or(lock_duration, |d| d + lock_duration),
+            );
+            r.lock_status() // TODO: tag the span with lock status
         } else {
             // should always call is_cache_locked() before this function
             panic!("cache_lock_wait on wrong type of lock")
@@ -1099,12 +1047,14 @@ impl HttpCache {
 
     /// How long did this request wait behind the read lock
     pub fn lock_duration(&self) -> Option<Duration> {
-        self.digest.lock_duration
+        // FIXME: this duration is lost when cache is disabled
+        self.inner.as_ref().and_then(|i| i.lock_duration)
     }
 
     /// How long did this request spent on cache lookup and reading the header
     pub fn lookup_duration(&self) -> Option<Duration> {
-        self.digest.lookup_duration
+        // FIXME: this duration is lost when cache is disabled
+        self.inner.as_ref().and_then(|i| i.lookup_duration)
     }
 
     /// Delete the asset from the cache storage
@@ -1153,14 +1103,6 @@ impl HttpCache {
         if let Some(predictor) = self.inner().predictor {
             predictor.mark_uncacheable(self.cache_key(), reason);
         }
-    }
-
-    /// Tag all spans as being part of a subrequest.
-    pub fn tag_as_subrequest(&mut self) {
-        self.inner_mut()
-            .traces
-            .cache_span
-            .set_tag(|| Tag::new("is_subrequest", true))
     }
 }
 

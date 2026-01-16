@@ -72,8 +72,4 @@ impl HandleMiss for MaxFileSizeMissHandler {
     async fn finish(self: Box<Self>) -> pingora_error::Result<usize> {
         self.inner.finish().await
     }
-
-    fn streaming_write_tag(&self) -> Option<&[u8]> {
-        self.inner.streaming_write_tag()
-    }
 }

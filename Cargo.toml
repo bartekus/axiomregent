@@ -33,7 +33,7 @@ swc_common = { path = "crates/encore/libs/swc/crates/swc_common", features = [
     "tty-emitter",
 ] }
 encore-tsparser = { path = "crates/encore/tsparser" }
-#encore-supervisor = { path = "crates/encore/supervisor" }
+encore-supervisor = { path = "crates/encore/supervisor" }
 
 [features]
 default = ["transport-stdio", "resolver-local", "skills-core"]
@@ -50,7 +50,7 @@ members = [
     "crates/run",
     "crates/xray",
     "crates/encore/tsparser",
-#    "crates/encore/supervisor",
+    "crates/encore/supervisor",
 ]
 
 [dependencies.featuregraph]
@@ -66,6 +66,7 @@ path = "crates/antigravity"
 path = "crates/run"
 
 [patch.crates-io]
+pingora = { path = "crates/encore/libs/pingora" }
 swc_ecma_parser = { path = "crates/encore/libs/swc/crates/swc_ecma_parser" }
 swc_ecma_ast = { path = "crates/encore/libs/swc/crates/swc_ecma_ast" }
 swc_ecma_transforms_base = { path = "crates/encore/libs/swc/crates/swc_ecma_transforms_base" }

@@ -37,10 +37,6 @@
 //! # Optional features
 //! `boringssl`: Switch the internal TLS library from OpenSSL to BoringSSL.
 
-// This enables the feature that labels modules that are only available with
-// certain pingora features
-#![cfg_attr(docsrs, feature(doc_cfg))]
-
 pub mod apps;
 pub mod connectors;
 pub mod listeners;
@@ -59,14 +55,8 @@ pub use pingora_error::{ErrorType::*, *};
 #[cfg(feature = "boringssl")]
 pub use pingora_boringssl as tls;
 
-#[cfg(feature = "openssl")]
+#[cfg(all(not(feature = "boringssl"), feature = "openssl"))]
 pub use pingora_openssl as tls;
-
-#[cfg(feature = "rustls")]
-pub use pingora_rustls as tls;
-
-#[cfg(not(feature = "any_tls"))]
-pub use protocols::tls::noop_tls as tls;
 
 pub mod prelude {
     pub use crate::server::configuration::Opt;

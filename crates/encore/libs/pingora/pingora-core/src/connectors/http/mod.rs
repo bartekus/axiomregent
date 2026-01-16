@@ -95,7 +95,6 @@ impl Connector {
 }
 
 #[cfg(test)]
-#[cfg(feature = "any_tls")]
 mod tests {
     use super::*;
     use crate::protocols::http::v1::client::HttpSession as Http1Session;

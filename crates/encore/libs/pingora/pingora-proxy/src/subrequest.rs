@@ -18,8 +18,7 @@ use core::task::{Context, Poll};
 use pingora_cache::lock::WritePermit;
 use pingora_core::protocols::raw_connect::ProxyDigest;
 use pingora_core::protocols::{
-    GetProxyDigest, GetSocketDigest, GetTimingDigest, Peek, SocketDigest, Ssl, TimingDigest,
-    UniqueID, UniqueIDType,
+    GetProxyDigest, GetSocketDigest, GetTimingDigest, SocketDigest, Ssl, TimingDigest, UniqueID,
 };
 use std::io::Cursor;
 use std::sync::Arc;
@@ -69,7 +68,7 @@ impl AsyncWrite for DummyIO {
 }
 
 impl UniqueID for DummyIO {
-    fn id(&self) -> UniqueIDType {
+    fn id(&self) -> i32 {
         0 // placeholder
     }
 }
@@ -93,8 +92,6 @@ impl GetSocketDigest for DummyIO {
         None
     }
 }
-
-impl Peek for DummyIO {}
 
 #[async_trait]
 impl pingora_core::protocols::Shutdown for DummyIO {
