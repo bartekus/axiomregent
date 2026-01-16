@@ -78,7 +78,7 @@ impl TsConfigPathResolver {
         &self.base_filename
     }
 
-    pub fn resolve(&self, import: &str) -> Option<PathBuf> {
+    pub fn resolve(&self, import: &str) -> Option<Cow<'_, str>> {
         for entry in &self.paths {
             match &entry.key {
                 PathVal::Exact(key) if import == key => {
@@ -86,7 +86,7 @@ impl TsConfigPathResolver {
                         if let PathVal::Exact(val) = val {
                             for candidate in file_candidates(self.base.join(val)) {
                                 if candidate.exists() {
-                                    return Some(candidate);
+                                    return Some(Cow::Borrowed(val));
                                 }
                             }
                         }
@@ -109,14 +109,14 @@ impl TsConfigPathResolver {
 
                                 for candidate in file_candidates(self.base.join(&rel_path)) {
                                     if candidate.exists() {
-                                        return Some(candidate);
+                                        return Some(Cow::Owned(rel_path));
                                     }
                                 }
                             }
                             PathVal::Exact(val) => {
                                 for candidate in file_candidates(self.base.join(val)) {
                                     if candidate.exists() {
-                                        return Some(candidate);
+                                        return Some(Cow::Borrowed(val));
                                     }
                                 }
                             }

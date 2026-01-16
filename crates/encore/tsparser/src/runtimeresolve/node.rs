@@ -6,14 +6,15 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
-use crate::runtimeresolve::exports::Exports;
-use crate::runtimeresolve::tsconfig::TsConfigPathResolver;
 use anyhow::{bail, Context, Error};
 use clean_path::Clean;
 use serde::Deserialize;
 use swc_common::sync::Lrc;
 use swc_common::FileName;
-use swc_ecma_loader::resolve::{Resolution, Resolve};
+use swc_ecma_loader::resolve::Resolve;
+
+use crate::runtimeresolve::exports::Exports;
+use crate::runtimeresolve::tsconfig::TsConfigPathResolver;
 
 static PACKAGE: &str = "package.json";
 
@@ -39,10 +40,7 @@ pub struct EncoreRuntimeResolver<R> {
 
 static DEFAULT_CONDITIONS: &[&str] = &["node-addons", "node", "import", "require", "default"];
 
-impl<R> EncoreRuntimeResolver<R>
-where
-    R: Resolve,
-{
+impl<R> EncoreRuntimeResolver<R> {
     pub fn new(
         inner: R,
         js_runtime_path: Option<PathBuf>,
@@ -77,7 +75,7 @@ where
             package_json_path.display()
         ))?;
 
-        let Some(pkg_exports): Option<&Exports> = pkg.exports.as_ref() else {
+        let Some(exports) = &pkg.exports else {
             bail!("no exports field in {}", package_json_path.display());
         };
 
@@ -86,9 +84,9 @@ where
         conditions.extend(DEFAULT_CONDITIONS);
 
         // The result is relative to the package directory, whereas we want to return an absolute path.
-        let result: Option<PathBuf> = pkg_exports
+        let result = exports
             .resolve_import_path(rel_target, &conditions)
-            .map(|p: PathBuf| p.to_path_buf());
+            .map(|p| p.to_path_buf());
         Ok(result.map(|p| pkg_dir.join(p)))
     }
 
@@ -143,37 +141,22 @@ impl<R> Resolve for EncoreRuntimeResolver<R>
 where
     R: Resolve,
 {
-    fn resolve(&self, base: &FileName, target: &str) -> Result<Resolution, Error> {
+    fn resolve(&self, base: &FileName, target: &str) -> Result<FileName, Error> {
         if let Some(tsconfig) = &self.tsconfig_resolver {
-            if let Some(path) = tsconfig.resolve(target) {
-                // path is absolute PathBuf with correct extension.
-                let filename = FileName::Real(path);
-                return Ok(Resolution {
-                    filename,
-                    slug: None,
-                });
+            if let Some(buf) = tsconfig.resolve(target) {
+                return self.inner.resolve(tsconfig.base(), buf.as_ref());
             }
         }
 
         let result = match self.resolve_encore_module(target)? {
-            Some(buf) => {
-                let filename = FileName::Real(buf.clean());
-                Resolution {
-                    filename,
-                    slug: None,
-                }
-            }
+            Some(buf) => FileName::Real(buf.clean()),
             None => self.inner.resolve(base, target)?,
         };
 
         // Prefer TypeScript declaration files (.d.ts) over JavaScript files if they exist.
-        if let FileName::Real(ref path) = result.filename {
+        if let FileName::Real(ref path) = result {
             if let Some(dts_path) = declaration_file(path) {
-                let filename = FileName::Real(dts_path);
-                return Ok(Resolution {
-                    filename,
-                    slug: None,
-                });
+                return Ok(FileName::Real(dts_path));
             }
         }
 

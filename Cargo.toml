@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-serde = { version = "1.0.197", features = ["derive"] }
+serde = { version = "=1.0.195", features = ["derive"] }
 serde_json = "1"
 anyhow = "1.0"
 thiserror = "1.0"
@@ -28,8 +28,10 @@ tokio = { version = "1.0", features = ["full"], optional = true }
 similar = "2.7.0"
 tar = "0.4.44"
 log = "0.4.29"
-env_logger = "0.11.8"
-swc_common = { version = "0.33", features = ["tty-emitter"] }
+env_logger = "0.9"
+swc_common = { path = "crates/encore/libs/swc/crates/swc_common", features = [
+    "tty-emitter",
+] }
 encore-tsparser = { path = "crates/encore/tsparser" }
 
 [features]
@@ -60,6 +62,9 @@ path = "crates/antigravity"
 
 [dependencies.run]
 path = "crates/run"
+
+[crates.encore.tsparser]
+path = "crates/encore/tsparser"
 
 [patch.crates-io]
 swc_ecma_parser = { path = "crates/encore/libs/swc/crates/swc_ecma_parser" }
