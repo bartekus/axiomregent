@@ -22,5 +22,5 @@ Tests cover:
 ## Usage
 To verify:
 ```bash
-cargo test --test verify_encore_run -- --test-threads=1
+cargo test --test verify_encore_run
 ```
