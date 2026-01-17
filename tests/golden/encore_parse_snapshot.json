@@ -1,0 +1,106 @@
+{
+  "services": [
+    {
+      "name": "anotherService",
+      "description": "Encore will consider this directory and all its subdirectories as part of the anotherService service.",
+      "apis": [
+        {
+          "name": "foo",
+          "path": "/foo",
+          "method": "GET",
+          "access": "private"
+        }
+      ]
+    },
+    {
+      "name": "exampleService",
+      "description": "Encore will consider this directory and all its subdirectories as part of the anotherService service.\nhttps://encore.dev/docs/ts/primitives/app-structure",
+      "apis": [
+        {
+          "name": "dashboardEndpoint",
+          "path": "/dashboard",
+          "method": "GET",
+          "access": "auth"
+        },
+        {
+          "name": "getUser",
+          "path": "/user/:id",
+          "method": "GET",
+          "access": "public"
+        },
+        {
+          "name": "listUsers",
+          "path": "/user",
+          "method": "GET",
+          "access": "public"
+        },
+        {
+          "name": "addUser",
+          "path": "/user",
+          "method": "POST",
+          "access": "public"
+        },
+        {
+          "name": "broken",
+          "path": "/broken",
+          "method": "GET",
+          "access": "public"
+        },
+        {
+          "name": "brokenWithErrorCode",
+          "path": "/broken/:id",
+          "method": "GET",
+          "access": "public"
+        },
+        {
+          "name": "dynamicPathParamExample",
+          "path": "/hello/:name",
+          "method": "GET",
+          "access": "public"
+        },
+        {
+          "name": "queryStringExample",
+          "path": "/hello",
+          "method": "GET",
+          "access": "public"
+        },
+        {
+          "name": "loggingExample",
+          "path": "/logging",
+          "method": "GET",
+          "access": "public"
+        },
+        {
+          "name": "microserviceCommunication",
+          "path": "/call",
+          "method": "GET",
+          "access": "public"
+        },
+        {
+          "name": "order",
+          "path": "/order",
+          "method": "POST",
+          "access": "public"
+        },
+        {
+          "name": "assets",
+          "path": "/assets/*path",
+          "method": "GET",
+          "access": "public"
+        },
+        {
+          "name": "serveHTML",
+          "path": "/html",
+          "method": "GET",
+          "access": "public"
+        },
+        {
+          "name": "schema",
+          "path": "/validate",
+          "method": "POST",
+          "access": "public"
+        }
+      ]
+    }
+  ]
+}

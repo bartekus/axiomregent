@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Bartek Kus
+// Feature: ENCORE_TS_INTEGRATION
+// Spec: spec/core/encore_ts.md
+
 use crate::tools::encore_ts::schemas::{ApiInfo, MetaSnapshotV1, ServiceInfo};
 use anyhow::{Context, Result};
 use encore_tsparser::parser::parser::{ParseContext, Parser};
@@ -20,6 +25,7 @@ impl Emitter for CapturingEmitter {
     fn emit(&mut self, db: &DiagnosticBuilder<'_>) {
         // In a real implementation we might want to collect these.
         // For now, let's just log them as warnings.
+        log::error!("Encore Parser Error: {}", db.message());
         log::warn!("Encore Parser: {}", db.message());
     }
 }
@@ -52,6 +58,10 @@ pub fn parse(root: &Path) -> Result<MetaSnapshotV1> {
             );
             let parser = Parser::new(&ctx, pass1);
             let result = parser.parse();
+
+            if handler.has_errors() {
+                anyhow::bail!("Encore TS parsing failed with errors");
+            }
 
             // Map ParseResult to MetaSnapshotV1
             let mut service_infos = Vec::new();

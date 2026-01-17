@@ -3,26 +3,26 @@
 // Feature: ENCORE_TS_INTEGRATION
 // Spec: spec/core/encore_ts.md
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::process::Child;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
+#[derive(Debug, Default)]
 pub struct EncoreState {
     pub processes: HashMap<String, RunProcess>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RunProcess {
     pub pid: u32,
     pub start_time: SystemTime,
-    pub child: Child,
-    pub log_buffer: Arc<Mutex<Vec<String>>>, // Simplified log buffer
-}
-
-impl Default for EncoreState {
-    fn default() -> Self {
-        Self::new()
-    }
+    #[serde(skip)]
+    pub child: Option<std::process::Child>, // Child is not serializable
+    #[serde(skip)]
+    pub log_buffer: Arc<Mutex<Vec<String>>>, // Not serializable, re-create or ignore on load
+    pub root_path: String, // Path to the app root
+    pub env: Option<HashMap<String, String>>,
 }
 
 impl EncoreState {

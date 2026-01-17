@@ -24,6 +24,12 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Install build deps (protoc)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler pkg-config
+          echo "PROTOC=$(command -v protoc)" >> "$GITHUB_ENV"
+
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
         with:

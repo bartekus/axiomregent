@@ -140,7 +140,9 @@ impl ModuleLoader {
             let mod_path = self
                 .resolver
                 .resolve(from_file, import_path)
-                .map_err(|err| Error::UnableToResolve(import_path.to_string(), err))?;
+                .map_err(|err| {
+                    Error::UnableToResolve(format!("{} from {}", import_path, from_file), err)
+                })?;
             match mod_path {
                 FileName::Real(ref buf) => {
                     if let Some(ext) = buf.extension().and_then(OsStr::to_str) {
