@@ -1,0 +1,9 @@
+{
+  "id": "017",
+  "name": "017_encore_lock_state",
+  "title": "PR 01: Lock & State Model",
+  "authors": ["Antigravity"],
+  "created_at": "2026-01-18T00:00:00Z",
+  "verification_status": "verified",
+  "depends_on": ["016"]
+}

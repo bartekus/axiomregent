@@ -1,0 +1,12 @@
+[encore-sup] INITIALIZING
+[encore-sup] ACQUIRING_LOCK path=...
+[encore-sup] LOCK_ACQUIRED ownership=Managed
+[encore-sup] SPAWNING process=encore child_pid=...
+[encore-sup] STATE_CHANGE from=Stopped to=Starting
+[encore-sup] READINESS_CHECK L1=Pending L2=Pending L3=Pending
+[encore-sup] READINESS_CHECK L1=OK L2=OK L3=OK
+[encore-sup] STATE_CHANGE from=Starting to=Healthy
+[encore-sup] STOPPING reason=shutdown
+[encore-sup] SIGNAL_SENT signal=SIGTERM
+[encore-sup] PROCESS_EXITED code=0
+[encore-sup] LOCK_RELEASED
