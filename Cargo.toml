@@ -8,7 +8,7 @@ edition = "2024"
 
 [dependencies]
 serde = { version = "=1.0.195", features = ["derive"] }
-pingora = { version = "=0.4.0", features = [ "openssl", "lb" ] }
+pingora = { version = "=0.4.0", features = ["openssl", "lb"] }
 serde_json = "1"
 anyhow = "1.0"
 thiserror = "1.0"
@@ -25,7 +25,7 @@ zstd = "0.13"
 tempfile = "3.8"
 chrono = { version = "0.4", features = ["serde"] }
 # Optional async runtime for future rmcp support
-tokio = { version = "1.0", features = ["full"], optional = true }
+tokio = { version = "1.0", features = ["full"] }
 similar = "2.7.0"
 tar = "0.4.44"
 log = "0.4.29"
@@ -35,6 +35,10 @@ swc_common = { path = "crates/encore/libs/swc/crates/swc_common", features = [
 ] }
 encore-tsparser = { path = "crates/encore/tsparser" }
 encore-supervisor = { path = "crates/encore/supervisor" }
+reqwest = { version = "0.13.1", features = ["blocking", "json"] }
+tokio-util = "0.7.18"
+fs2 = "0.4.3"
+libc = "0.2.180"
 
 [features]
 default = ["transport-stdio", "resolver-local", "skills-core"]
@@ -42,7 +46,7 @@ transport-stdio = []
 resolver-local = []
 skills-core = []
 deny-exec = []
-rmcp = ["tokio"]
+rmcp = []
 
 [workspace]
 members = [
@@ -83,6 +87,10 @@ swc_atoms = { path = "crates/encore/libs/swc/crates/swc_atoms" }
 swc_common = { path = "crates/encore/libs/swc/crates/swc_common" }
 swc_ecma_loader = { path = "crates/encore/libs/swc/crates/swc_ecma_loader" }
 swc_ecma_visit = { path = "crates/encore/libs/swc/crates/swc_ecma_visit" }
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["full"] }
+tokio-util = "0.7.18"
 
 [workspace.dependencies]
 tokio = "1"

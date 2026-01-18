@@ -18,5 +18,7 @@ pub mod util;
 pub mod workspace;
 pub use featuregraph;
 pub use xray;
+pub mod readiness;
 pub mod run_tools;
+pub mod supervisor;
 // pub mod xray_tools;

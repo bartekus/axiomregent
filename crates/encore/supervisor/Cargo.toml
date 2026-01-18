@@ -16,14 +16,13 @@ tokio = { version = "1.38.0", features = [
 ] }
 tokio-retry = "0.3.0"
 tokio-util = { version = "0.7.11", features = ["rt"] }
-fs2 = "0.4.3"
 base64 = "0.21.5"
 prost = "0.12.3"
 prost-types = "0.12.3"
 serde_json = "1.0"
 flate2 = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-pingora = { version = "0.4", features = ["lb"] }
+pingora = { version = "0.4", features = [ "lb" ] }
 anyhow = "1.0.76"
 hyper = { version = "1.1.0", features = ["server", "http1", "http2", "client"] }
 url = "2.5.0"
@@ -36,6 +35,3 @@ openssl = { version = "0.10.68", features = ["vendored"] }
 
 [build-dependencies]
 prost-build = { version = "0.12.1" }
-
-[dev-dependencies]
-tempfile = "3"
