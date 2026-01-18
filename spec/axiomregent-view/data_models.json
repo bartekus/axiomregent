@@ -1,0 +1,147 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "ActivityEntry": {
+      "properties": {
+        "action": { "type": "string" },
+        "id": { "type": "string" },
+        "timestamp": { "type": ["string", "null"], "description": "Server-reported timestamp only. Optional." },
+        "user_id": { "type": "string" }
+      },
+      "required": ["id", "action"],
+      "type": "object"
+    },
+    "ChangesetMetaV1": {
+      "properties": {
+        "base_state": { "type": "string" },
+        "base_state_created_at": { "type": "string" },
+        "changeset_id": { "type": "string" },
+        "intent": { "type": "string" },
+        "plan_sha256": { "type": "string" },
+        "repo_key": { "type": "string" },
+        "schema_version": { "type": "string" }
+      },
+      "required": ["schema_version", "changeset_id", "repo_key"],
+      "type": "object"
+    },
+    "ChangesetStatus": {
+      "properties": {
+        "execution": { "$ref": "#/definitions/ExecutionStatus" },
+        "schema_version": { "type": "string" },
+        "state": { "enum": ["pending_validation", "validated", "approved", "executed", "failed"], "type": "string" },
+        "validation": { "$ref": "#/definitions/ValidationStatus" },
+        "verification": { "$ref": "#/definitions/VerificationSummary" }
+      },
+      "required": ["schema_version", "state", "validation", "execution"],
+      "type": "object"
+    },
+    "ChangesetSummary": {
+      "properties": {
+        "base_state": { "type": "string" },
+        "changeset_id": { "type": "string" },
+        "intent": { "type": "string" },
+        "repo_key": { "type": "string" }
+      },
+      "required": ["changeset_id", "repo_key", "base_state", "intent"],
+      "type": "object"
+    },
+    "ExecutionStatus": {
+      "properties": {
+        "error": { "type": ["string", "null"] },
+        "log": { "items": { "$ref": "#/definitions/ExecutionEntry" }, "type": "array" },
+        "state": { "enum": ["pending", "running", "completed", "failed"], "type": "string" },
+        "steps_completed": { "type": "integer" }
+      },
+      "required": ["state", "steps_completed", "log"],
+      "type": "object"
+    },
+    "ExecutionEntry": {
+        "properties": {
+            "step_id": { "type": "string" },
+            "status": { "type": "string" },
+            "output": { "type": ["string", "null"] }
+        },
+        "required": ["step_id", "status"],
+        "type": "object"
+    },
+    "ToolCallError": {
+      "properties": {
+        "code": { "type": "integer" },
+        "message": { "type": "string" }
+      },
+      "required": ["code", "message"],
+      "type": "object"
+    },
+    "ToolCallRequest": {
+      "properties": {
+        "arguments": { "type": "object" },
+        "name": { "type": "string" }
+      },
+      "required": ["name"],
+      "type": "object"
+    },
+    "ToolCallResponse": {
+      "properties": {
+        "content": {
+          "items": {
+              "properties": {
+                  "type": { "type": "string" },
+                  "text": { "type": "string" },
+                  "json": { "type": "object" }
+              },
+              "type": "object"
+          },
+          "type": "array"
+        },
+        "isError": { "type": "boolean" }
+      },
+      "required": ["content"],
+      "type": "object"
+    },
+    "ToolDescriptor": {
+      "properties": {
+        "description": { "type": "string" },
+        "inputSchema": { "type": "object" },
+        "name": { "type": "string" }
+      },
+      "required": ["name", "inputSchema"],
+      "type": "object"
+    },
+    "ValidationStatus": {
+      "properties": {
+        "checks": {
+          "items": { "$ref": "#/definitions/ValidationResult" },
+          "type": "array"
+        },
+        "state": { "enum": ["valid", "invalid"], "type": "string" }
+      },
+      "required": ["state", "checks"],
+      "type": "object"
+    },
+    "ValidationResult": {
+        "properties": {
+            "check_name": { "type": "string" },
+            "passed": { "type": "boolean" },
+            "message": { "type": ["string", "null"] }
+        },
+        "required": ["check_name", "passed"],
+        "type": "object"
+    },
+    "VerificationResult": {
+      "properties": {
+        "outcome": { "type": "string" },
+        "profile": { "type": "string" },
+        "timestamp": { "type": ["string", "null"], "description": "Server-reported timestamp only. Optional." }
+      },
+      "required": ["profile", "outcome"],
+      "type": "object"
+    },
+    "VerificationSummary": {
+      "properties": {
+        "last_run": { "$ref": "#/definitions/VerificationResult" }
+      },
+      "required": ["last_run"],
+      "type": "object"
+    }
+  }
+}
