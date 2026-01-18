@@ -1,0 +1,9 @@
+{
+  "id": "018",
+  "name": "018_encore_process_mgmt",
+  "title": "PR 02: Process Management (Spawn/Kill)",
+  "authors": ["Antigravity"],
+  "created_at": "2026-01-18T00:00:00Z",
+  "verification_status": "in_progress",
+  "depends_on": ["017"]
+}
