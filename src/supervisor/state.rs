@@ -7,7 +7,8 @@ pub enum State {
     Starting,
     Healthy,
     Unhealthy,
-    Exited,
+    Backoff,
+    Fatal,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

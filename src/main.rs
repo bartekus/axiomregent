@@ -14,7 +14,8 @@ use std::sync::Arc;
 
 // POLICY: stdout is RESERVED for protocol messages.
 // All logs, panics, and diagnostics MUST write to stderr.
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     // 0. Setup Logging & Panic Safety
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .target(Target::Stderr)
@@ -73,6 +74,68 @@ fn main() -> Result<()> {
     let encore_tools = Arc::new(axiomregent::tools::encore_ts::tools::EncoreTools::new());
     let run_tools = Arc::new(axiomregent::run_tools::RunTools::new(&run_root));
 
+    // 3.5 Setup Supervisor
+    let log_buffer = Arc::new(axiomregent::supervisor::buffer::LogBuffer::new(1000));
+    let (supervisor_handle, command_rx) =
+        axiomregent::supervisor::SupervisorHandle::new(log_buffer.clone());
+
+    let lock_path = run_root.join(".axiomregent/encore.lock");
+    // SAFETY: If we can't lock, we assume another instance matches.
+    // For now we just log and don't spawn the managed supervisor loop.
+    let _lock = match axiomregent::supervisor::lock::FileLock::try_acquire(lock_path.clone()) {
+        Ok(lock) => {
+            log::info!("Acquired supervisor lock. Running in Managed mode.");
+
+            let cwd = run_root.clone();
+            let cmd = std::env::var("AXIOM_ENCORE_CMD").unwrap_or_else(|_| "encore".to_string());
+            let mut args = vec![
+                "run".to_string(),
+                "--tag".to_string(),
+                "axiomregent".to_string(),
+            ];
+            if let Ok(extra) = std::env::var("AXIOM_ENCORE_ARGS") {
+                args.extend(extra.split_whitespace().map(String::from));
+            }
+
+            // Default probe: HTTP /
+            let http_check = Arc::new(axiomregent::readiness::HttpCheck {
+                path: "/".to_string(),
+            });
+            let probe = axiomregent::readiness::HealthProbe::new(vec![http_check]);
+
+            let supervisor = axiomregent::supervisor::Supervisor {
+                cmd,
+                args,
+                cwd,
+                env: std::env::vars().collect(),
+                health_probe: Some(probe),
+                log_buffer: log_buffer.clone(),
+                state: supervisor_handle.state.clone(),
+                command_rx,
+            };
+
+            let token = tokio_util::sync::CancellationToken::new();
+            tokio::spawn(async move {
+                if let Err(e) = supervisor.run(token).await {
+                    log::error!("Supervisor loop exited with error: {}", e);
+                }
+            });
+
+            Some(lock)
+        }
+        Err(e) => {
+            log::warn!(
+                "Failed to acquire lock: {}. Running in Observer/External mode.",
+                e
+            );
+            None
+        }
+    };
+
+    let supervisor_tools = Arc::new(axiomregent::supervisor::tools::SupervisorTools::new(
+        supervisor_handle,
+    ));
+
     // 4. Setup Router
     let router = Router::new(
         resolver,
@@ -84,6 +147,7 @@ fn main() -> Result<()> {
         antigravity_tools,
         encore_tools,
         run_tools,
+        supervisor_tools,
     );
 
     // 4. Stdio Loop (MCP framing)

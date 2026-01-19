@@ -565,6 +565,41 @@
       }
     },
     {
+      "name": "encore.status",
+      "description": "Get Encore Supervisor status",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "encore.restart",
+      "description": "Restart Encore Supervisor",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "force": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "name": "encore.logs",
+      "description": "Get Encore Supervisor logs",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    {
       "name": "run.execute",
       "description": "Execute a run skill",
       "inputSchema": {

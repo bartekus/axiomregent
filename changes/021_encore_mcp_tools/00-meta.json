@@ -1,0 +1,8 @@
+{
+  "id": "021_encore_mcp_tools",
+  "title": "Encore MCP Tools",
+  "description": "Implement MCP tools for Encore Supervisor",
+  "author": "Antigravity",
+  "status": "implemented",
+  "created_at": "2026-01-19T10:30:00-07:00"
+}
