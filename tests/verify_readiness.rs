@@ -27,6 +27,7 @@ fn test_endpoint_detection_and_file_write() -> Result<()> {
             cwd: std::env::current_dir()?,
             env: vec![],
             health_probe: None,
+            log_buffer: std::sync::Arc::new(axiomregent::supervisor::buffer::LogBuffer::new(100)),
         };
 
         let token = CancellationToken::new();

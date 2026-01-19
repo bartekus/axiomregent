@@ -22,11 +22,10 @@ pub struct TcpCheck;
 impl ReadinessCheck for TcpCheck {
     fn check(&self, ctx: &ReadinessContext) -> Result<()> {
         let endpoint = ctx.endpoint.as_ref().context("No endpoint detected yet")?;
-        let addr = endpoint
+        let addr = *endpoint
             .socket_addrs(|| None)?
             .first()
-            .ok_or_else(|| anyhow::anyhow!("No socket addr"))?
-            .clone();
+            .ok_or_else(|| anyhow::anyhow!("No socket addr"))?;
 
         TcpStream::connect_timeout(&addr, Duration::from_secs(1))
             .map(|_| ())

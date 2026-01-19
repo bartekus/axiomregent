@@ -1,11 +1,14 @@
+pub mod buffer;
 pub mod lock;
 pub mod process;
 pub mod state;
 
 use crate::readiness::{HealthProbe, ReadinessContext};
+use buffer::LogBuffer;
 use process::kill_gracefully;
 use regex::Regex;
 use serde::Serialize;
+use std::sync::Arc;
 use std::{path::PathBuf, process::Stdio, time::Duration};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
@@ -25,6 +28,7 @@ pub struct Supervisor {
     pub cwd: PathBuf,
     pub env: Vec<(String, String)>,
     pub health_probe: Option<HealthProbe>,
+    pub log_buffer: Arc<LogBuffer>,
 }
 
 impl Supervisor {
@@ -47,44 +51,44 @@ impl Supervisor {
         let (tx, mut rx) = tokio::sync::watch::channel::<Option<String>>(None);
 
         // stdout pump
+        let log_buffer = self.log_buffer.clone();
         tokio::spawn(async move {
             let re = Regex::new(r"Running on (http://[^\s]+)").expect("regex validity");
             let mut reader = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = reader.next_line().await {
                 log::info!("stdout: {}", line);
-                if let Some(caps) = re.captures(&line) {
-                    if let Some(url) = caps.get(1) {
-                        let u = url.as_str().to_string();
-                        log::info!("Detected endpoint: {}", u);
+                log_buffer.push(line.clone());
+                if let Some(url) = re.captures(&line).and_then(|c| c.get(1)) {
+                    let u = url.as_str().to_string();
+                    log::info!("Detected endpoint: {}", u);
 
-                        // Write info file
-                        let info = EncoreInfo {
-                            endpoint: u.clone(),
-                            pid,
-                        };
+                    // Write info file
+                    let info = EncoreInfo {
+                        endpoint: u.clone(),
+                        pid,
+                    };
 
-                        if let Err(e) = std::fs::create_dir_all(".axiomregent/run") {
-                            log::error!("Failed to create run dir: {}", e);
-                        } else {
-                            if let Ok(json) = serde_json::to_string(&info) {
-                                if let Err(e) = std::fs::write(".axiomregent/run/encore.json", json)
-                                {
-                                    log::error!("Failed to write encore.json: {}", e);
-                                }
-                            }
+                    if let Err(e) = std::fs::create_dir_all(".axiomregent/run") {
+                        log::error!("Failed to create run dir: {}", e);
+                    } else if let Ok(json) = serde_json::to_string(&info) {
+                        #[allow(clippy::collapsible_if)]
+                        if let Err(e) = std::fs::write(".axiomregent/run/encore.json", json) {
+                            log::error!("Failed to write encore.json: {}", e);
                         }
-
-                        let _ = tx.send(Some(u));
                     }
+
+                    let _ = tx.send(Some(u));
                 }
             }
         });
 
         // stderr pump
+        let log_buffer_err = self.log_buffer.clone();
         tokio::spawn(async move {
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
                 log::info!("stderr: {}", line);
+                log_buffer_err.push(line);
             }
         });
 
@@ -98,10 +102,8 @@ impl Supervisor {
                         return;
                     }
                     let val = rx.borrow().clone();
-                    if let Some(u) = val {
-                        if let Ok(parsed) = url::Url::parse(&u) {
-                            break parsed;
-                        }
+                    if let Some(parsed) = val.and_then(|u| url::Url::parse(&u).ok()) {
+                        break parsed;
                     }
                     if rx.changed().await.is_err() {
                         return;
@@ -138,3 +140,6 @@ impl Supervisor {
         }
     }
 }
+
+#[cfg(test)]
+mod integration_tests;
