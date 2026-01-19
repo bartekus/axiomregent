@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 pub struct FileLock {
     file: File,
-    path: PathBuf,
+    _path: PathBuf,
 }
 
 impl FileLock {
@@ -21,7 +21,7 @@ impl FileLock {
                 path
             )
         })?;
-        Ok(Self { file, path })
+        Ok(Self { file, _path: path })
     }
 }
 
