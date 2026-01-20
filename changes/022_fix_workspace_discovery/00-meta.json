@@ -1,0 +1,8 @@
+{
+  "id": "022_fix_workspace_discovery",
+  "title": "Fix Workspace Root Discovery",
+  "description": "Fix incorrect workspace root detection when launching from subdirectories",
+  "author": "Antigravity",
+  "status": "implemented",
+  "created_at": "2026-01-19T19:50:00-07:00"
+}
