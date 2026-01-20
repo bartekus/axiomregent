@@ -42,7 +42,8 @@ async fn main() -> Result<()> {
         }
     };
 
-    let run_root = dirs.first().cloned().unwrap_or_else(|| PathBuf::from("."));
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let run_root = axiomregent::util::paths::discover_workspace_root(&cwd);
 
     let fs = RealFs;
     let resolver = Arc::new(ResolveEngine::new(fs, dirs));
@@ -79,6 +80,9 @@ async fn main() -> Result<()> {
     let (supervisor_handle, command_rx) =
         axiomregent::supervisor::SupervisorHandle::new(log_buffer.clone());
 
+    if let Err(e) = std::fs::create_dir_all(run_root.join(".axiomregent")) {
+        log::warn!("Failed to create .axiomregent directory: {}", e);
+    }
     let lock_path = run_root.join(".axiomregent/encore.lock");
     // SAFETY: If we can't lock, we assume another instance matches.
     // For now we just log and don't spawn the managed supervisor loop.
