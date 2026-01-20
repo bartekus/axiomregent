@@ -18,6 +18,10 @@ fn test_endpoint_detection_and_file_write() -> Result<()> {
             let _ = std::fs::remove_dir_all(&run_dir);
         }
 
+        let log_buffer = std::sync::Arc::new(axiomregent::supervisor::buffer::LogBuffer::new(100));
+        let (s_handle, command_rx) =
+            axiomregent::supervisor::SupervisorHandle::new(log_buffer.clone());
+
         let sup = Supervisor {
             cmd: "sh".into(),
             args: vec![
@@ -27,7 +31,9 @@ fn test_endpoint_detection_and_file_write() -> Result<()> {
             cwd: std::env::current_dir()?,
             env: vec![],
             health_probe: None,
-            log_buffer: std::sync::Arc::new(axiomregent::supervisor::buffer::LogBuffer::new(100)),
+            log_buffer: log_buffer.clone(),
+            state: s_handle.state.clone(),
+            command_rx,
         };
 
         let token = CancellationToken::new();

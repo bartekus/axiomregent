@@ -14,6 +14,7 @@ use crate::router::mounts::MountRegistry;
 use crate::run_tools::RunTools;
 use crate::snapshot::lease::StaleLeaseError;
 use crate::snapshot::tools::SnapshotTools;
+use crate::supervisor::tools::SupervisorTools;
 use crate::tools::encore_ts::tools::EncoreTools;
 use crate::workspace::WorkspaceTools;
 use featuregraph::tools::FeatureGraphTools;
@@ -94,6 +95,7 @@ pub struct Router {
     antigravity_tools: Arc<AntigravityTools>,
     encore_tools: Arc<EncoreTools>,
     run_tools: Arc<RunTools>,
+    supervisor_tools: Arc<SupervisorTools>,
 }
 
 impl Router {
@@ -108,6 +110,7 @@ impl Router {
         antigravity_tools: Arc<AntigravityTools>,
         encore_tools: Arc<EncoreTools>,
         run_tools: Arc<RunTools>,
+        supervisor_tools: Arc<SupervisorTools>,
     ) -> Self {
         Self {
             resolver,
@@ -119,6 +122,7 @@ impl Router {
             antigravity_tools,
             encore_tools,
             run_tools,
+            supervisor_tools,
         }
     }
 
@@ -451,6 +455,36 @@ impl Router {
                                     "from_seq": { "type": "integer" }
                                 },
                                 "required": ["run_id"]
+                            }
+                        },
+                        // Encore Supervisor Tools
+                        {
+                            "name": "encore.status",
+                            "description": "Get Encore Supervisor status",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {}
+                            }
+                        },
+                        {
+                            "name": "encore.restart",
+                            "description": "Restart Encore Supervisor",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "force": { "type": "boolean" }
+                                }
+                            }
+                        },
+                        {
+                            "name": "encore.logs",
+                            "description": "Get Encore Supervisor logs",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "limit": { "type": "integer" },
+                                    "offset": { "type": "integer" }
+                                }
                             }
                         },
                         // Run Tools
@@ -808,6 +842,29 @@ impl Router {
                             .antigravity_tools
                             .verify(repo_root, changeset_id, profile)
                         {
+                            Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
+                            Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                        }
+                    }
+
+                    // --- Encore Supervisor Tools ---
+                    "encore.status" => match self.supervisor_tools.status() {
+                        Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
+                        Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                    },
+                    "encore.restart" => {
+                        let force = args.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
+                        match self.supervisor_tools.restart(force) {
+                            Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
+                            Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
+                        }
+                    }
+                    "encore.logs" => {
+                        let limit =
+                            args.get("limit").and_then(|v| v.as_u64()).unwrap_or(100) as usize;
+                        let offset =
+                            args.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                        match self.supervisor_tools.logs(limit, offset) {
                             Ok(val) => handle_tool_result_value(req.id.clone(), Ok(val)),
                             Err(e) => handle_tool_result_value(req.id.clone(), Err(e)),
                         }

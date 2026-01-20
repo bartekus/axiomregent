@@ -38,6 +38,12 @@ fn create_router() -> Router {
     let root = std::env::current_dir().unwrap();
     let run_tools = Arc::new(axiomregent::run_tools::RunTools::new(&root));
 
+    let log_buffer = Arc::new(axiomregent::supervisor::buffer::LogBuffer::new(100));
+    let (s_handle, _) = axiomregent::supervisor::SupervisorHandle::new(log_buffer);
+    let supervisor_tools = Arc::new(axiomregent::supervisor::tools::SupervisorTools::new(
+        s_handle,
+    ));
+
     Router::new(
         resolver,
         mounts,
@@ -48,6 +54,7 @@ fn create_router() -> Router {
         antigravity_tools,
         encore_tools,
         run_tools,
+        supervisor_tools,
     )
 }
 
