@@ -88,11 +88,7 @@ async fn main() -> Result<()> {
 
             let cwd = run_root.clone();
             let cmd = std::env::var("AXIOM_ENCORE_CMD").unwrap_or_else(|_| "encore".to_string());
-            let mut args = vec![
-                "run".to_string(),
-                "--tag".to_string(),
-                "axiomregent".to_string(),
-            ];
+            let mut args = vec!["run".to_string()];
             if let Ok(extra) = std::env::var("AXIOM_ENCORE_ARGS") {
                 args.extend(extra.split_whitespace().map(String::from));
             }
