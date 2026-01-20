@@ -76,7 +76,12 @@ fn test_mcp_tools_list() {
     let tools = res["tools"].as_array().expect("tools should be an array");
 
     // Check for required tools
-    let required_tools = vec!["resolve_mcp", "list_mounts", "antigravity.propose"];
+    let required_tools = vec![
+        "resolve_mcp",
+        "list_mounts",
+        "antigravity.propose",
+        "encore.status",
+    ];
     for req_tool in required_tools {
         let found = tools.iter().any(|t| t["name"] == req_tool);
         assert!(found, "Tool {} not found", req_tool);
