@@ -1,57 +1,64 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright (C) 2026 Bartek Kus
-// Feature: ENCORE_TS_INTEGRATION
-// Spec: spec/core/encore_ts.md
-
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnvInfo {
-    pub deployed: bool,
-    pub version: String,
+    pub node_version: Option<String>,
+    pub npm_version: Option<String>,
+    pub tsparser_path: Option<String>,
+    pub tsbundler_path: Option<String>,
+    pub details: Vec<String>,
 }
 
 pub fn check() -> Result<EnvInfo> {
-    let output = match Command::new("encore").arg("version").output() {
-        Ok(o) => o,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(EnvInfo {
-                deployed: false,
-                version: String::new(),
-            });
+    let mut info = EnvInfo {
+        node_version: None,
+        npm_version: None,
+        tsparser_path: None,
+        tsbundler_path: None,
+        details: Vec::new(),
+    };
+
+    // Check Node
+    match Command::new("node").arg("--version").output() {
+        Ok(out) if out.status.success() => {
+            let v = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            info.node_version = Some(v);
         }
-        Err(e) => return Err(e).context("Failed to execute 'encore version'")?,
-    };
-
-    if !output.status.success() {
-        return Ok(EnvInfo {
-            deployed: false,
-            version: String::new(),
-        });
+        _ => info.details.push("Node.js not found".to_string()),
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    // output format example: "encore v1.35.0 (2024-03-22T15:27:06Z) macos-arm64"
-    // or just "v1.35.0"
-    let parts: Vec<&str> = stdout.split_whitespace().collect();
-    let version = if parts.first() == Some(&"encore") && parts.len() > 1 {
-        parts[1].to_string()
+    // Check NPM
+    match Command::new("npm").arg("--version").output() {
+        Ok(out) if out.status.success() => {
+            let v = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            info.npm_version = Some(v);
+        }
+        _ => info.details.push("npm not found".to_string()),
+    }
+
+    // Check tsparser-encore
+    // We assume it's in PATH or we might look in crates location for dev
+    if let Ok(path) = which::which("tsparser-encore") {
+        info.tsparser_path = Some(path.to_string_lossy().to_string());
     } else {
-        parts.first().unwrap_or(&"unknown").to_string()
-    };
-
-    // Also check for node
-    if Command::new("node").arg("--version").output().is_err() {
-        return Ok(EnvInfo {
-            deployed: false,
-            version: "Missing Node.js".to_string(), // Or handle differently
-        });
+        // Fallback for dev environment: check cargo target dir?
+        // This is heuristic for dev environment
+        let dev_path = std::path::Path::new("target/debug/tsparser-encore");
+        if dev_path.exists() {
+            info.tsparser_path = Some(dev_path.to_string_lossy().to_string());
+        } else {
+            info.details.push("tsparser-encore not found".to_string());
+        }
     }
 
-    Ok(EnvInfo {
-        deployed: true,
-        version,
-    })
+    // Check tsbundler-encore (not used directly yet but good to check)
+    if let Ok(path) = which::which("tsbundler-encore") {
+        info.tsbundler_path = Some(path.to_string_lossy().to_string());
+    } else {
+        info.details.push("tsbundler-encore not found".to_string());
+    }
+
+    Ok(info)
 }

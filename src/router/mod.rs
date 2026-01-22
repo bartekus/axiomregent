@@ -412,7 +412,29 @@ impl Router {
                         },
                         {
                             "name": "encore.ts.meta",
-                            "description": "Get Encore TS application metadata",
+                            "description": "Get Encore TS application metadata (alias to parse)",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "root": { "type": "string" }
+                                },
+                                "required": ["root"]
+                            }
+                        },
+                        {
+                            "name": "encore.ts.codegen",
+                            "description": "Generate user-facing code (enc.gen)",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "root": { "type": "string" }
+                                },
+                                "required": ["root"]
+                            }
+                        },
+                        {
+                            "name": "encore.ts.compile",
+                            "description": "Compile endpoints and generate CmdSpecs",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -886,7 +908,21 @@ impl Router {
                             Some(v) => std::path::Path::new(v),
                             None => return json_rpc_error(req.id.clone(), -32602, "root required"),
                         };
-                        handle_tool_result_value(req.id.clone(), self.encore_tools.meta(root))
+                        handle_tool_result_value(req.id.clone(), self.encore_tools.parse(root))
+                    }
+                    "encore.ts.codegen" => {
+                        let root = match args.get("root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => return json_rpc_error(req.id.clone(), -32602, "root required"),
+                        };
+                        handle_tool_result_value(req.id.clone(), self.encore_tools.codegen(root))
+                    }
+                    "encore.ts.compile" => {
+                        let root = match args.get("root").and_then(|v| v.as_str()) {
+                            Some(v) => std::path::Path::new(v),
+                            None => return json_rpc_error(req.id.clone(), -32602, "root required"),
+                        };
+                        handle_tool_result_value(req.id.clone(), self.encore_tools.compile(root))
                     }
                     "encore.ts.run.start" => {
                         let root = match args.get("root").and_then(|v| v.as_str()) {

@@ -319,6 +319,7 @@ dependencies = [
  "url",
  "uuid",
  "walkdir",
+ "which 8.0.0",
  "xray",
  "zstd",
 ]

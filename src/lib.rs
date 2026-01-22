@@ -3,6 +3,8 @@
 // Feature: MCP_ROUTER
 // Spec: spec/core/router.md
 
+#![recursion_limit = "256"] // Increased for large json! macros in router
+
 pub mod antigravity_tools;
 pub mod config;
 pub mod feature_tools;
