@@ -5,12 +5,10 @@ pub mod rpc;
 pub mod state;
 pub mod tools;
 
-use crate::readiness::{HealthProbe, ReadinessContext};
+use crate::readiness::HealthProbe;
 use crate::supervisor::state::{State, SupervisorStatus};
 use buffer::LogBuffer;
 use process::kill_gracefully;
-use regex::Regex;
-use serde::Serialize;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::{path::PathBuf, process::Stdio, time::Duration};
@@ -59,12 +57,6 @@ impl SupervisorHandle {
     }
 }
 
-#[derive(Serialize)]
-struct EncoreInfo {
-    endpoint: String,
-    pid: u32,
-}
-
 pub struct Supervisor {
     pub cmd: String,
     pub args: Vec<String>,
@@ -79,8 +71,6 @@ pub struct Supervisor {
 impl Supervisor {
     pub async fn run(mut self, token: CancellationToken) -> std::io::Result<()> {
         let cmd_name = self.cmd.clone();
-
-        let re = Regex::new(r"Running on (http://[^\s]+)").expect("regex validity");
 
         loop {
             if token.is_cancelled() {
@@ -105,7 +95,8 @@ impl Supervisor {
                 .envs(self.env.clone())
                 .current_dir(&self.cwd)
                 .stdout(Stdio::piped())
-                .stderr(Stdio::piped());
+                .stderr(Stdio::piped())
+                .stdin(Stdio::piped()); // Enable stdin for RPC
 
             let mut child = match cmd.spawn() {
                 Ok(c) => c,
@@ -126,111 +117,53 @@ impl Supervisor {
                 s.pid = Some(pid);
             }
 
-            let stdout = child.stdout.take().expect("stdout piped");
+            // stderr pump (Logs)
             let stderr = child.stderr.take().expect("stderr piped");
-
-            let (tx, mut rx) = tokio::sync::watch::channel::<Option<String>>(None);
-
-            // stdout pump
-            let log_buffer = self.log_buffer.clone();
-            let state_ref = self.state.clone();
-            let re_clone = re.clone();
-            tokio::spawn(async move {
-                let mut reader = BufReader::new(stdout).lines();
-                while let Ok(Some(line)) = reader.next_line().await {
-                    log::info!("stdout: {}", line);
-                    log_buffer.push(line.clone());
-                    if let Some(url) = re_clone.captures(&line).and_then(|c| c.get(1)) {
-                        let u = url.as_str().to_string();
-                        log::info!("Detected endpoint: {}", u);
-
-                        {
-                            let mut s = state_ref.write().unwrap();
-                            s.endpoint = Some(u.clone());
-                        }
-
-                        let info = EncoreInfo {
-                            endpoint: u.clone(),
-                            pid,
-                        };
-
-                        if let Err(e) = std::fs::create_dir_all(".axiomregent/run") {
-                            log::error!("Failed to create run dir: {}", e);
-                        } else if let Ok(json) = serde_json::to_string(&info) {
-                            #[allow(clippy::collapsible_if)]
-                            if let Err(e) = std::fs::write(".axiomregent/run/encore.json", json) {
-                                log::error!("Failed to write encore.json: {}", e);
-                            }
-                        }
-
-                        let _ = tx.send(Some(u));
-                    }
-                }
-            });
-
-            // stderr pump
             let log_buffer_err = self.log_buffer.clone();
             tokio::spawn(async move {
                 let mut reader = BufReader::new(stderr).lines();
                 while let Ok(Some(line)) = reader.next_line().await {
-                    log::info!("stderr: {}", line);
+                    // log::info!("stderr: {}", line);
                     log_buffer_err.push(line);
                 }
             });
 
-            let probe_token = CancellationToken::new();
-            let probe_token_clone = probe_token.clone();
+            // Initializing RPC Client (takes stdin/stdout)
+            // We interpret "Protocol Skeleton" as: we TRY to perform handshake.
+            // If it fails (e.g. legacy daemon), we might fall back or just error for now (as this is a replacement).
+            // For MVP, we assume the binary supports it.
+            let mut client_opt = match crate::supervisor::rpc::DaemonClient::new(&mut child) {
+                Ok(c) => Some(c),
+                Err(e) => {
+                    log::error!("Failed to create DaemonClient: {}", e);
+                    None
+                    // We continue, child might just be running without RPC?
+                    // But we consumed stdout/stdin, so maybe just kill it?
+                    // For now, let's proceed to wait to see if it exits.
+                }
+            };
 
-            if let Some(probe) = &self.health_probe {
-                let probe = probe.clone();
-                let state_ref = self.state.clone();
-
-                tokio::spawn(async move {
-                    let endpoint_url = loop {
-                        if probe_token_clone.is_cancelled() {
-                            return;
-                        }
-                        let val = rx.borrow().clone();
-                        if let Some(parsed) = val.and_then(|u| url::Url::parse(&u).ok()) {
-                            break parsed;
-                        }
-                        if rx.changed().await.is_err() {
-                            return;
-                        }
-                    };
-
-                    let ctx = ReadinessContext {
-                        endpoint: Some(endpoint_url),
-                    };
-
-                    loop {
-                        if probe_token_clone.is_cancelled() {
-                            break;
-                        }
-                        match probe.check(&ctx) {
-                            Ok(_) => {
-                                let mut s = state_ref.write().unwrap();
-                                if s.state != State::Healthy {
-                                    log::info!("Transition to Healthy");
-                                    s.state = State::Healthy;
-                                }
-                            }
-                            Err(e) => {
-                                let mut s = state_ref.write().unwrap();
-                                if s.state == State::Healthy {
-                                    log::warn!("Transition to Unhealthy: {}", e);
-                                    s.state = State::Unhealthy;
-                                }
-                            }
-                        }
-                        tokio::time::sleep(Duration::from_secs(5)).await;
-                    }
-                });
+            if let Some(ref mut client) = client_opt {
+                log::info!("Performing Daemon Handshake...");
+                if let Err(e) = client.hello().await {
+                    log::error!("Daemon Handshake failed: {}", e);
+                    // If handshake triggers failure, we might want to restart?
+                } else {
+                    log::info!("Daemon Handshake success.");
+                    // Mark healthy? Or wait for probe?
+                }
             }
+
+            let probe_token = CancellationToken::new();
+            // ... (Probe logic can remain if we have an endpoint, but we don't detect it via regex anymore)
+            // ... (Ideally ensure() returns the endpoint. For now, probe is effectively disabled unless we get endpoint from somewhere else)
 
             tokio::select! {
                  _ = token.cancelled() => {
                      probe_token.cancel();
+                     if let Some(mut client) = client_opt {
+                         let _ = client.shutdown().await;
+                     }
                      kill_gracefully(&mut child).await?;
                      break;
                  }
@@ -239,8 +172,10 @@ impl Supervisor {
                          Some(SupervisorCommand::Restart) => {
                              log::info!("Restart requested");
                              probe_token.cancel();
+                             if let Some(mut client) = client_opt {
+                                 let _ = client.shutdown().await;
+                             }
                              kill_gracefully(&mut child).await?;
-                             // Loop continues to restart
                          }
                          None => {
                              probe_token.cancel();
@@ -261,12 +196,9 @@ impl Supervisor {
                                  s.endpoint = None;
                              }
                              tokio::time::sleep(Duration::from_secs(2)).await;
-                             // Loop continues to backoff/restart
                          }
                          Err(e) => {
                              log::error!("Wait failed: {}", e);
-                             // If wait fails, we probably should restart logic or backoff.
-                             // Breaking here means restarting loop.
                          }
                      }
                  }

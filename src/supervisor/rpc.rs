@@ -111,4 +111,47 @@ impl DaemonClient {
         }
         Ok(())
     }
+
+    pub async fn ensure(&mut self, req: serde_json::Value) -> Result<serde_json::Value> {
+        let resp = self.send_request("infra.ensure", Some(req)).await?;
+        match resp.result {
+            Some(val) => Ok(val),
+            None => {
+                if let Some(err) = resp.error {
+                    Err(anyhow!("Infra Ensure failed: {}", err.message))
+                } else {
+                    Err(anyhow!("Infra Ensure returned empty result"))
+                }
+            }
+        }
+    }
+
+    pub async fn shutdown(&mut self) -> Result<()> {
+        let resp = self.send_request("daemon.shutdown", None).await?;
+        if let Some(err) = resp.error {
+            return Err(anyhow!("Daemon Shutdown failed: {}", err.message));
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_rpc_request_serialization() {
+        let req = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: 1,
+            method: "infra.ensure".to_string(),
+            params: Some(json!({"foo": "bar"})),
+        };
+        let s = serde_json::to_string(&req).unwrap();
+        assert_eq!(
+            s,
+            r#"{"jsonrpc":"2.0","id":1,"method":"infra.ensure","params":{"foo":"bar"}}"#
+        );
+    }
 }
