@@ -1,6 +1,7 @@
 pub mod buffer;
 pub mod lock;
 pub mod process;
+pub mod rpc;
 pub mod state;
 pub mod tools;
 

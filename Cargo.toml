@@ -35,6 +35,7 @@ swc_common = { path = "crates/encore/libs/swc/crates/swc_common", features = [
 ] }
 encore-tsparser = { path = "crates/encore/tsparser" }
 encore-supervisor = { path = "crates/encore/supervisor" }
+
 reqwest = { version = "0.13.1", features = ["blocking", "json"] }
 tokio-util = "0.7.18"
 fs2 = "0.4.3"
@@ -56,6 +57,7 @@ members = [
     "crates/xray",
     "crates/encore/tsparser",
     "crates/encore/supervisor",
+
 ]
 
 [dependencies.featuregraph]
