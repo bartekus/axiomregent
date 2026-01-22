@@ -42,7 +42,8 @@ async fn main() -> Result<()> {
         }
     };
 
-    let run_root = dirs.first().cloned().unwrap_or_else(|| PathBuf::from("."));
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let run_root = axiomregent::util::paths::discover_workspace_root(&cwd);
 
     let fs = RealFs;
     let resolver = Arc::new(ResolveEngine::new(fs, dirs));
@@ -79,6 +80,9 @@ async fn main() -> Result<()> {
     let (supervisor_handle, command_rx) =
         axiomregent::supervisor::SupervisorHandle::new(log_buffer.clone());
 
+    if let Err(e) = std::fs::create_dir_all(run_root.join(".axiomregent")) {
+        log::warn!("Failed to create .axiomregent directory: {}", e);
+    }
     let lock_path = run_root.join(".axiomregent/encore.lock");
     // SAFETY: If we can't lock, we assume another instance matches.
     // For now we just log and don't spawn the managed supervisor loop.
@@ -88,11 +92,7 @@ async fn main() -> Result<()> {
 
             let cwd = run_root.clone();
             let cmd = std::env::var("AXIOM_ENCORE_CMD").unwrap_or_else(|_| "encore".to_string());
-            let mut args = vec![
-                "run".to_string(),
-                "--tag".to_string(),
-                "axiomregent".to_string(),
-            ];
+            let mut args = vec!["run".to_string()];
             if let Ok(extra) = std::env::var("AXIOM_ENCORE_ARGS") {
                 args.extend(extra.split_whitespace().map(String::from));
             }

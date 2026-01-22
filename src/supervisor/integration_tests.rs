@@ -17,7 +17,7 @@ mod tests {
             cmd: "sh".to_string(),
             args: vec![
                 "-c".to_string(),
-                "echo 'hello world'; echo 'error log' >&2; sleep 1".to_string(),
+                "echo 'ignored stdout'; echo 'error log' >&2; sleep 1".to_string(),
             ],
             cwd,
             env: vec![],
@@ -37,9 +37,7 @@ mod tests {
 
         let logs = log_buffer.read();
 
-        // Verify stdout
-        assert!(logs.iter().any(|l| l.contains("hello world")));
-        // Verify stderr
+        // Verify stderr (stdout is consumed by RPC)
         assert!(logs.iter().any(|l| l.contains("error log")));
 
         token.cancel();

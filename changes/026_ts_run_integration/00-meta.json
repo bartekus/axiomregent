@@ -1,0 +1,11 @@
+{
+  "id": "026",
+  "name": "ts_run_integration",
+  "feature_id": "encore_daemon_replacement",
+  "status": "completed",
+  "summary": "Implements running Encore apps via supervisor-encore without Go daemon.",
+  "authors": [
+    "antigravity"
+  ],
+  "created_at": "2026-01-22"
+}

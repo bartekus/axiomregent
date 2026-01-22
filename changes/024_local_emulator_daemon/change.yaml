@@ -1,0 +1,7 @@
+id: "024"
+name: "local_emulator_daemon_mvp"
+status: "proposed"
+feature_id: "encore_daemon_replacement"
+summary: "Implements the Local Emulator Daemon MVP RPC methods and integrates them into the Supervisor."
+authors: ["antigravity"]
+created_at: "2026-01-22"

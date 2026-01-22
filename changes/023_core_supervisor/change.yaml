@@ -1,0 +1,7 @@
+id: "023"
+name: "core_supervisor_protocol"
+status: "proposed"
+feature_id: "encore_daemon_replacement"
+summary: "Implements the core supervisor JSON-RPC 2.0 protocol skeleton and cleans up redundant crates."
+authors: ["antigravity"]
+created_at: "2026-01-20"

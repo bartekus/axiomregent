@@ -6,7 +6,9 @@ use prepare::PrepareError;
 use serde::{Deserialize, Serialize};
 
 pub use codegen::{CodegenParams, CodegenResult};
-pub use compile::CompileParams;
+pub use compile::{
+    ArtifactString, CmdSpec, CompileParams, CompileResult, Entrypoint, JSBuildOutput,
+};
 pub use parse::{ParseError, ParseParams};
 pub use prepare::{PackageVersion, PrepareParams};
 pub use test::TestParams;

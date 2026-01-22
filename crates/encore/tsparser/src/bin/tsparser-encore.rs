@@ -16,11 +16,9 @@ use encore_tsparser::parser::parser::ParseContext;
 use encore_tsparser::{app, builder};
 
 fn main() -> Result<()> {
-    // tracing_subscriber::fmt()
-    //     .with_span_events(FmtSpan::ENTER)
-    //     .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-    //     .with_writer(io::stderr)
-    //     .init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .target(env_logger::Target::Stderr)
+        .init();
     let cwd = std::env::current_dir()?;
 
     let globals = Globals::new();
@@ -79,8 +77,12 @@ fn main() -> Result<()> {
                 }
             };
 
+            let stdin_handle = io::stdin();
+            let mut stdin_lock = stdin_handle.lock();
+
             loop {
-                let cmd = match parse_cmd()? {
+                // We pass the lock explicitly
+                let cmd = match parse_cmd(&mut stdin_lock)? {
                     Some(cmd) => cmd,
                     None => return Ok(()),
                 };
@@ -236,10 +238,7 @@ enum Command {
     GenUserFacing(GenUserFacingInput),
 }
 
-fn parse_cmd() -> Result<Option<Command>> {
-    let stdin = io::stdin();
-    let mut stdin = stdin.lock();
-
+fn parse_cmd(stdin: &mut io::StdinLock) -> Result<Option<Command>> {
     // Read a line and see what it says.
     let line = {
         let mut line = String::new();
