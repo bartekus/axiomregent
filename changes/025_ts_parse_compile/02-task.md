@@ -1,0 +1,4 @@
+- [x] Implement `TsParserClient`
+- [x] Implement `EncoreTools` (env.check, parse, codegen, compile)
+- [x] Register tools in Router
+- [x] Verify `encore.ts.parse` with integration test

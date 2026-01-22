@@ -212,11 +212,11 @@ pub struct BinaryConfig {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Proc {
-    id: String,
-    command: Vec<String>,
-    env: Vec<String>,
-    services: Vec<String>,
-    gateways: Vec<String>,
+    pub id: String,
+    pub command: Vec<String>,
+    pub env: Vec<String>,
+    pub services: Vec<String>,
+    pub gateways: Vec<String>,
 }
 
 // Process config is the config for a given process

@@ -1,0 +1,11 @@
+{
+  "id": "025",
+  "name": "ts_parse_compile_tools",
+  "feature_id": "encore_daemon_replacement",
+  "status": "completed",
+  "summary": "Implements TS environment check, parsing, and compilation tools.",
+  "authors": [
+    "antigravity"
+  ],
+  "created_at": "2026-01-22"
+}

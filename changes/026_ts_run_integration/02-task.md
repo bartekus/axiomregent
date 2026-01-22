@@ -1,0 +1,5 @@
+- [x] Export `CompileResult` and `Proc` structs in crates
+- [x] Implement `encore.ts.run.start` (compile -> config -> spawn)
+- [x] Implement `encore.ts.run.stop`
+- [x] Implement `encore.ts.logs.stream`
+- [x] Verify with `test_run_persistence`

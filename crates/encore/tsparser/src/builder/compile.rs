@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::app::AppDesc;
 use anyhow::{Context, Result};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::builder::codegen::CodegenParams;
 use crate::builder::transpiler::{
@@ -23,18 +23,18 @@ pub struct CompileParams<'a> {
     pub nodejs_runtime: NodeJSRuntime,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CompileResult {
     pub outputs: Vec<JSBuildOutput>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct JSBuildOutput {
     pub artifact_dir: PathBuf,
     pub entrypoints: Vec<Entrypoint>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Entrypoint {
     pub cmd: CmdSpec,
     pub services: Vec<String>,
@@ -44,7 +44,7 @@ pub struct Entrypoint {
 
 pub type ArtifactString = String;
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CmdSpec {
     pub command: Vec<ArtifactString>,
     pub env: Vec<ArtifactString>,
